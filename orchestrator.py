@@ -357,10 +357,26 @@ class Orchestrator:
     ) -> bool:  # type: ignore[name-defined]
         if self.state.view == "agenda":
             seeds = self._seed_events_for_agenda(force_new=force_new)
-            allow_overwrite = not force_new
+            allow_overwrite = not force_new and bool(self.state.events)
+            originals_source = (
+                [self.state.events[self.state.agenda_index]]
+                if allow_overwrite and 0 <= self.state.agenda_index < len(self.state.events)
+                else []
+            )
         else:
-            seeds = self._seed_events_for_month(force_new=force_new)
-            allow_overwrite = not force_new
+            has_existing = bool(self._month_events_for_selected_date())
+            select_single = not force_new and self.state.month_focus == "events" and has_existing
+            seeds = self._seed_events_for_month(
+                force_new=force_new, selected_only=select_single
+            )
+            allow_overwrite = not force_new and has_existing
+            month_events = self._month_events_for_selected_date()
+            if select_single and 0 <= self.state.month_event_index < len(month_events):
+                originals_source = [month_events[self.state.month_event_index]]
+            elif allow_overwrite:
+                originals_source = month_events
+            else:
+                originals_source = []
 
         if not seeds:
             return False
@@ -382,11 +398,7 @@ class Orchestrator:
             return True
 
         updated_events = cast(List[Event], result)
-        originals: List[Event] = []
-        if self.state.view == "agenda" and self.state.events and allow_overwrite:
-            originals = [self.state.events[self.state.agenda_index]]
-        else:
-            originals = []
+        originals: List[Event] = originals_source if allow_overwrite else []
 
         try:
             new_events = self.state.events
@@ -430,11 +442,18 @@ class Orchestrator:
 
         return [Event(datetime=parse_datetime(dt_str), event="", details="")]
 
-    def _seed_events_for_month(self, *, force_new: bool = False) -> List[Event]:
+    def _seed_events_for_month(
+        self,
+        *,
+        force_new: bool = False,
+        selected_only: bool = False,
+    ) -> List[Event]:
         sel_day = self.state.month_selected_date
         if not force_new:
             evs = self._month_events_for_selected_date()
             if evs:
+                if selected_only and 0 <= self.state.month_event_index < len(evs):
+                    return [evs[self.state.month_event_index]]
                 return evs
         dt_str = f"{sel_day.strftime('%Y-%m-%d')} {SEEDED_DEFAULT_TIME}"
         from models import parse_datetime
