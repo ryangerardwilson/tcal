@@ -44,14 +44,16 @@ class Orchestrator:
         self.last_tick_ms = 0
 
     def run(self) -> int:
-
         return self._run_curses()
 
     def _run_curses(self) -> int:
         try:
             curses.wrapper(self._curses_main)
-        except Exception as e:
-            print(e) 
+        except KeyboardInterrupt:
+            return 130
+        except curses.error as exc:
+            print(f"curses error: {exc}")
+            return 1
         return 0
 
     def _curses_main(self, stdscr: "curses.window") -> None:  # type: ignore[name-defined]
@@ -68,7 +70,6 @@ class Orchestrator:
             self.state.overlay = "error"
             self.state.overlay_message = f"Storage error: {exc}"
             self.state.events = []
-
 
         self._draw(stdscr)
 
