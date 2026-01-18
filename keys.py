@@ -14,6 +14,8 @@ KEY_ESC = 27
 KEY_I = ord("i")
 KEY_TAB = 9
 KEY_D = ord("d")
+KEY_CTRL_H = 8
+KEY_CTRL_L = 12
 
 KEY_H = ord("h")
 KEY_J = ord("j")
@@ -34,6 +36,8 @@ __all__ = [
     "KEY_I",
     "KEY_TAB",
     "KEY_D",
+    "KEY_CTRL_H",
+    "KEY_CTRL_L",
     "KEY_H",
     "KEY_J",
     "KEY_K",

@@ -30,6 +30,8 @@ from keys import (
     KEY_TAB,
     KEY_TODAY,
     KEY_D,
+    KEY_CTRL_H,
+    KEY_CTRL_L,
 )
 from models import Event, ValidationError
 from state import AppState
@@ -363,6 +365,18 @@ class Orchestrator:
     def _handle_month_keys(self, ch: int) -> bool:
         view = MonthView(self.state.events)
         if self.state.month_focus == "grid":
+            if ch == KEY_CTRL_H:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, -1
+                )
+                self.state.month_event_index = 0
+                return True
+            if ch == KEY_CTRL_L:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, +1
+                )
+                self.state.month_event_index = 0
+                return True
             if ch == KEY_H:
                 self.state.month_selected_date = view.move_day(
                     self.state.month_selected_date, -1
@@ -398,6 +412,22 @@ class Orchestrator:
         else:  # focus == events
             if ch == KEY_TAB:
                 return False
+            if ch == KEY_CTRL_H:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, -1
+                )
+                self.state.month_event_index = 0
+                if not view.events_by_date.get(self.state.month_selected_date):
+                    self.state.month_focus = "grid"
+                return True
+            if ch == KEY_CTRL_L:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, +1
+                )
+                self.state.month_event_index = 0
+                if not view.events_by_date.get(self.state.month_selected_date):
+                    self.state.month_focus = "grid"
+                return True
             if ch == KEY_J:
                 self.state.month_event_index = view.clamp_event_index(
                     self.state.month_selected_date, self.state.month_event_index + 1

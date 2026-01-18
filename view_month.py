@@ -177,6 +177,15 @@ class MonthView:
     def move_week(self, selected_date: date, delta_weeks: int) -> date:
         return selected_date + timedelta(days=7 * delta_weeks)
 
+    def move_month(self, selected_date: date, delta_months: int) -> date:
+        year = selected_date.year + ((selected_date.month - 1 + delta_months) // 12)
+        month = (selected_date.month - 1 + delta_months) % 12 + 1
+        day = selected_date.day
+        # Clamp day to end of target month
+        _, max_day = calendar.monthrange(year, month)
+        day = min(day, max_day)
+        return date(year, month, day)
+
     def clamp_event_index(self, selected_date: date, idx: int) -> int:
         evs = self.events_by_date.get(selected_date, [])
         if not evs:
