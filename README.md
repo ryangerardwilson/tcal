@@ -4,6 +4,32 @@
 
 ---
 
+## Installation
+
+### Prebuilt binary (Linux x86_64)
+
+`tcal` publishes PyInstaller bundles with each GitHub release. The quickest way to install the latest release is via the helper script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/tcal/main/install.sh | bash
+```
+
+The script downloads the `tcal-linux-x64.tar.gz` artifact, extracts it into `~/.tcal/app`, and drops a shim in `~/.tcal/bin`. It will attempt to add that directory to your `PATH` (unless you opt out) so you can just run `tcal` from any shell.
+
+Installer flags of note:
+
+- `--version <x.y.z>` or `-v <x.y.z>`: install a specific tagged release (`v0.3.0`, etc.).
+- `--binary /path/to/tcal-linux-x64.tar.gz`: install from a previously downloaded archive.
+- `--no-modify-path`: skip auto-updating shell config files; the script will print the PATH export you should add manually.
+
+You can also download the archive directly from the releases page and run `install.sh --binary` if you prefer.
+
+### From source
+
+If you’d rather run directly from the repo (handy for development or non-Linux hosts), follow the requirements below and execute `python main.py` like before.
+
+---
+
 ## Features
 
 - **Agenda + Month views** with Vim-style `hjkl` navigation
