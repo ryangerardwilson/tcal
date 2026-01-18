@@ -156,7 +156,10 @@ class Orchestrator:
             if ch == ord("m"):
                 self.state.view = "month"
                 return True
+            if ch == ord("n"):
+                return self._edit_or_create(stdscr, force_new=True)
             return True  # unknown leader key just cancels
+
 
         if ch == KEY_LEADER:
             self.state.leader.active = True
@@ -177,7 +180,8 @@ class Orchestrator:
             return self._jump_today()
 
         if ch == KEY_I:
-            return self._edit_or_create(stdscr)
+            force_new = self.state.view == "agenda" and not self.state.events
+            return self._edit_or_create(stdscr, force_new=force_new)
 
         # View-specific navigation
         if self.state.view == "agenda":
@@ -281,11 +285,14 @@ class Orchestrator:
             return True
 
     # Editing / creating
-    def _edit_or_create(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+    def _edit_or_create(self, stdscr: "curses.window", *, force_new: bool = False) -> bool:  # type: ignore[name-defined]
         if self.state.view == "agenda":
-            seed = self._seed_event_for_agenda()
+            seed = self._seed_event_for_agenda(force_new=force_new)
+            original_allowed = False if force_new else True
         else:
             seed = self._seed_event_for_month()
+            original_allowed = True
+
         if seed is None:
             return False
 
@@ -306,7 +313,7 @@ class Orchestrator:
         updated = cast(Event, result)
         # If editing, detect original
         original = None
-        if self.state.view == "agenda" and self.state.events:
+        if original_allowed and self.state.view == "agenda" and self.state.events:
             original = self.state.events[self.state.agenda_index]
         elif self.state.view == "month":
             evs = [e for e in self.state.events if e.datetime.date() == self.state.month_selected_date]
@@ -335,10 +342,10 @@ class Orchestrator:
             self._show_overlay(stdscr, f"Storage error: {exc}", kind="error")
         return True
 
-    def _seed_event_for_agenda(self) -> Event | None:
-        if self.state.events and 0 <= self.state.agenda_index < len(self.state.events):
+    def _seed_event_for_agenda(self, *, force_new: bool = False) -> Event | None:
+        if not force_new and self.state.events and 0 <= self.state.agenda_index < len(self.state.events):
             return self.state.events[self.state.agenda_index]
-        # Empty: create new seeded event today 09:00
+        # Empty or forced new: create new seeded event today 09:00
         today = date.today()
         dt_str = f"{today.strftime('%Y-%m-%d')} {SEEDED_DEFAULT_TIME}"
         from models import parse_datetime
