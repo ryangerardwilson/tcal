@@ -355,6 +355,7 @@ class Orchestrator:
     def _edit_or_create(
         self, stdscr: "curses.window", *, force_new: bool = False
     ) -> bool:  # type: ignore[name-defined]
+        single_event_payload = False
         if self.state.view == "agenda":
             seeds = self._seed_events_for_agenda(force_new=force_new)
             allow_overwrite = not force_new and bool(self.state.events)
@@ -363,6 +364,7 @@ class Orchestrator:
                 if allow_overwrite and 0 <= self.state.agenda_index < len(self.state.events)
                 else []
             )
+            single_event_payload = len(seeds) == 1
         else:
             has_existing = bool(self._month_events_for_selected_date())
             select_single = not force_new and self.state.month_focus == "events" and has_existing
@@ -377,11 +379,16 @@ class Orchestrator:
                 originals_source = month_events
             else:
                 originals_source = []
+            single_event_payload = len(seeds) == 1
 
         if not seeds:
             return False
 
-        payload = seeds
+        payload: Event | List[Event]
+        if single_event_payload:
+            payload = seeds[0]
+        else:
+            payload = seeds
 
         # Exit curses before launching editor
         curses.def_prog_mode()
