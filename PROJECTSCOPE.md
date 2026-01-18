@@ -86,11 +86,12 @@ Anything that requires background services, OAuth, or long-running network conne
 ```json
 {
   "data_csv_path": "/home/ryan/.tcal/event.csv",
-  "editor": "vim"
+  "openai_api_key": "sk-..."
 }
 ```
 - `data_csv_path` is required; if missing, default to `$XDG_DATA_HOME/tcal/event.csv` (fallback `~/.tcal/event.csv`) and ensure directories exist.
-- `editor` is optional; fallback order: config → `$EDITOR` env → `vim`.
+- `openai_api_key` is optional; if present, it enables natural-language event creation via CLI (e.g., `python main.py "meet Alex on 2026-09-07"`).
+- Editor is fixed to `vim`.
 
 ### 6.2 CSV Schema
 Columns:

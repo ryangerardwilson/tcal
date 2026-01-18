@@ -15,6 +15,8 @@ Tcal is a **Vim-first, terminal-native calendar** for folks who live in Vim and 
 - **Keyboard supreme** – every action is reachable with predictable, Vim-inspired bindings.
 - **Terminal-native** – no GUI toolkits, no mouse assumptions, no background daemons.
 - **Transparent storage** – events live in a simple CSV file at a configurable path (default `$XDG_DATA_HOME/tcal/event.csv`, fallback `~/.tcal/event.csv`).
+- **Fixed editor** – editing always opens Vim; no config override.
+- **Optional AI input** – if `openai_api_key` is set in config, you can add events via natural language on the CLI (e.g., `python main.py "meet Alex on 2026-09-07"`).
 - **Small modules** – `main.py` stays tiny, `orchestrator.py` owns top-level policy, leaf modules do one thing.
 
 The detailed scope, non-goals, and roadmap live in [`PROJECTSCOPE.md`](./PROJECTSCOPE.md).

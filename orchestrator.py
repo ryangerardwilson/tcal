@@ -10,6 +10,9 @@ from typing import List, Sequence, cast
 
 from config import load_config
 from editor import edit_event_via_editor
+
+DEFAULT_EDITOR = "vim"
+
 from keys import (
     KEY_CAP_Q,
     KEY_ESC,
@@ -314,7 +317,7 @@ class Orchestrator:
         # Exit curses before launching editor
         curses.def_prog_mode()
         curses.endwin()
-        ok, result = edit_event_via_editor(self.config.editor, payload)
+        ok, result = edit_event_via_editor(DEFAULT_EDITOR, payload)
         curses.reset_prog_mode()
         stdscr.refresh()
         curses.curs_set(0)

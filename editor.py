@@ -11,6 +11,8 @@ from typing import List, Tuple
 
 from models import Event, ValidationError, event_to_jsonable, normalize_event_payload
 
+DEFAULT_EDITOR = "vim"
+
 
 class EditorError(Exception):
     pass
