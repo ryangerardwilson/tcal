@@ -1,83 +1,131 @@
 # tcal
 
-Tcal is a **Vim-first, terminal-native calendar** for folks who live in Vim and
-want a fast way to browse days, weeks, and months without leaving the terminal.
-It is written in Python using `curses`, keeps a flat project layout, and
-mirrors the thin-`main.py`/central-`orchestrator.py` pattern used across my
-other tools.
+`tcal` is a vim-first, terminal-native calendar for people who keep their hands on the keyboard. It offers fast month/agenda navigation, external editing via your terminal editor, and a natural-language CLI powered by OpenAI’s structured outputs.
 
 ---
 
-## Status
+## Features
 
-🚧 Early scaffolding. The current build now targets the v0 contract: Agenda +
-Month views, external editing via `$EDITOR` on a temp JSON, and CSV-backed
-storage.
-
----
-
-## Philosophy
-
-- **Keyboard supreme** – every action is reachable with predictable, Vim-inspired bindings.
-- **Terminal-native** – no GUI toolkits, no mouse assumptions, no background daemons.
-- **Transparent storage** – events live in a simple CSV file at a configurable path (default `$XDG_DATA_HOME/tcal/event.csv`, fallback `~/.tcal/event.csv`).
-- **Fixed editor** – editing always opens Vim; no config override.
-- **Optional AI input** – if `openai_api_key` is set in config, you can add events via natural language on the CLI (e.g., `python main.py "meet Alex on 2026-09-07"`).
-- **Small modules** – `main.py` stays tiny, `orchestrator.py` owns top-level policy, leaf modules do one thing.
-
-The detailed scope, non-goals, and roadmap live in
-[`PROJECTSCOPE.md`](./PROJECTSCOPE.md).
+- **Agenda + Month views** with Vim-style `hjkl` navigation
+- **Leader key (` , `)** to jump between views (` ,a ` agenda, ` ,m ` month)
+- **External editing** (`i`) that opens the selected event as JSON in `$EDITOR` (default `vim`)
+- **Natural-language CLI** (e.g. `python main.py "show me today's events"`) with intents for creating, listing, and rescheduling events (absolute or relative time shifts)
+- **Quick delete** by double–tapping `d` (`dd`) in Agenda or the month’s event list
+- **Month jumping** inside the month view with `Ctrl+h` / `Ctrl+l`
+- **CSV-backed storage** with a thin `CalendarService`
 
 ---
 
-## Usage (current)
+## Requirements
+
+- Python 3.11+
+- A Unix-y terminal with `curses`
+- OpenAI API key (only required for the natural-language CLI path)
+
+Install dependencies (none besides stdlib) and run from the repo root:
 
 ```bash
-python main.py
+python main.py        # launches curses UI
+python main.py "show me today's events"   # natural-language CLI
 ```
-
-You should see a placeholder screen with a header and a quit hint. Press `q` to
-exit. As features land, this section will expand with keybindings and
-workflows.
 
 ---
 
-## Roadmap Snapshot
+## Configuration
 
-Short-term goals:
+`tcal` looks for `$XDG_CONFIG_HOME/tcal/config.json` (fallback `~/.config/tcal/config.json`). Trailing commas are tolerated.
 
-1. CSV-backed storage module (stdlib `csv`) with deterministic schema.
-2. Month grid + day detail rendering.
-3. Agenda list view with navigation.
-4. External edit flow (`i`) that opens `$EDITOR` on a temp JSON (supports create when none selected).
-5. Help overlay (`?`) describing keybindings.
+Example config:
 
-Medium-term goals:
+```json
+{
+  "data_csv_path": "/home/example/.local/share/tcal/events.csv",
+  "openai_api_key": "sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "model": "gpt-4o-mini"
+}
+```
 
-- Configurable keybindings via config file.
-- Agenda-style rolling list view.
-- Optional ICS import/export commands.
+- `data_csv_path` (optional) overrides where events are stored. Defaults to `$XDG_DATA_HOME/tcal/event.csv` (fallback `~/.tcal/event.csv`).
+- `openai_api_key` unlocks natural-language intents. If omitted, the CLI UI still works.
+- `model` lets you pin a specific OpenAI chat model; defaults to `gpt-4o-mini`.
 
-Out-of-scope for now: CalDAV/Google sync, notifications, natural-language
-assistants, background services.
+The config loader ensures parent directories exist and will fall back gracefully if fields are missing.
+
+---
+
+## Usage
+
+### Curses UI
+
+Run `python main.py` and use the shortcuts below. Events are loaded from the CSV path in config. Editing an event writes it as JSON to a temp file, opens `$EDITOR`, and saves changes back to CSV after validation.
+
+### Natural-language CLI
+
+If `openai_api_key` is set, any quoted argument is interpreted as a natural-language command:
+
+```bash
+python main.py "create a meeting with Maanas tomorrow at 3pm"
+python main.py "show me this month's events"
+python main.py "reschedule meeting with Maanas to next Tuesday 11am"
+python main.py "postpone standup by 2 days"
+```
+
+Supported intents:
+
+- `create_event`: add a new event with datetime/event/details
+- `list_events`: show events for `today`, `tomorrow`, `this_week`, `next_month`, `all`, etc., optionally filtered by keywords ("related to wiom")
+- `reschedule_event`: move an event to a new absolute datetime or shift it by a relative amount (`relative_amount` + `relative_unit` like days/ hours/ weeks)
+
+The executor validates OpenAI responses against JSON Schema and surfaces errors when the API rejects parameters (e.g., unsupported `max_tokens`).
+
+---
+
+## Keyboard Shortcuts
+
+| Key / Sequence | Scope | Action |
+| -------------- | ----- | ------ |
+| `q` / `Q`      | global | Quit |
+| `?`            | global | Toggle help overlay |
+| `t`            | global | Jump to today |
+| `,m` / `,a`    | global | Switch to Month / Agenda views |
+| `i`            | view (item) | Edit/create via `$EDITOR` |
+| `dd`           | agenda + month events | Delete selected event |
+| `Ctrl+h` / `Ctrl+l` | month view | Previous / next month |
+| `h/j/k/l`      | agenda + month | Move selection | 
+| `Tab`          | month view | Toggle focus between calendar grid and day’s event list |
+| `Esc`          | overlays / leader | Dismiss help / cancel leader / exit month-event focus |
+
+Leader sequences time out after 1 second.
+
+---
+
+## Troubleshooting
+
+- **Missing OpenAI key**: CLI prints “Missing openai_api_key…” and exits with code 1. Set the key in config.
+- **HTTP 400 / API errors**: The natural-language executor reports the exact message returned by OpenAI (e.g., unsupported parameter). Adjust config/model accordingly.
+- **Invalid JSON in config**: Trailing commas are auto-stripped; otherwise the loader falls back to defaults.
+- **Editor errors**: If `$EDITOR` exits non-zero or the JSON fails validation, tcal shows an overlay and discards changes.
+
+---
+
+## Architecture Highlights
+
+- `main.py` – thin entrypoint; delegates to `Orchestrator`
+- `orchestrator.py` – curses lifecycle, input routing, leader logic, NL CLI entry
+- `calendar_service.py` – loading/upserting/deleting events in CSV storage
+- `actions.py` / `intents.py` / `nl_executor.py` – structured OpenAI intents (create/list/reschedule)
+- `date_ranges.py` – helpers for “today”, “this_week”, “next_month”, etc.
+- `view_agenda.py` / `view_month.py` – rendering + navigation, including `Ctrl+h/l` month jumps and `dd` deletion states
+
+All modules live in a flat repo structure for now.
 
 ---
 
 ## Development
 
-- Entry: `python main.py`
+- Run: `python main.py`
+- Tests: invoke your preferred runner / add `pytest` as needed (none included yet)
 - Python 3.11+
-- Dependencies: Python standard library only (`csv`, `curses`)
+- Pure stdlib dependencies (`curses`, `csv`, `json`, etc.)
 
-Structure mirrors other projects in this workspace:
-
-```
-tcal/
-├─ main.py          # thin entrypoint
-├─ orchestrator.py  # argument parsing + curses loop
-├─ README.md
-└─ PROJECTSCOPE.md
-```
-
-As functionality grows, expect small modules to appear alongside
-(`event_store.py`, `app_state.py`, etc.).
+Feel free to open issues or PRs with new view ideas (week/day), ICS export support, or improved NL tooling.

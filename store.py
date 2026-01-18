@@ -84,8 +84,9 @@ def upsert_event(
     else:
         updated = list(events)
     updated.append(new_event)
-    save_events(path, updated)
-    return updated
+    ordered = sorted(updated, key=lambda e: (e.datetime, e.event, e.details))
+    save_events(path, ordered)
+    return ordered
 
 
 __all__ = ["load_events", "save_events", "upsert_event", "StorageError"]
