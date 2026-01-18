@@ -19,10 +19,12 @@ ${APP} Installer
 Usage: install.sh [options]
 
 Options:
-  -h, --help              Display this help message
-  -v, --version <version> Install a specific version (e.g., 0.1.0 or v0.1.0)
-  -b, --binary <path>     Install from a local binary instead of downloading
-      --no-modify-path    Don't modify shell config files (.zshrc, .bashrc, etc.)
+  -h, --help                 Display this help message
+  -v, --version <version>    Install a specific version (e.g., 0.1.0 or v0.1.0)
+      --version              (no argument) Print the latest release version and exit
+      --upgrade              Reinstall latest release if a newer version is available
+  -b, --binary <path>        Install from a local binary instead of downloading
+      --no-modify-path       Don't modify shell config files (.zshrc, .bashrc, etc.)
 
 Examples:
   curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | bash
@@ -34,6 +36,9 @@ EOF
 requested_version=${VERSION:-}
 no_modify_path=false
 binary_path=""
+upgrade=false
+show_version=false
+specific_version_override=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -42,6 +47,14 @@ while [[ $# -gt 0 ]]; do
       [[ -n "${2:-}" ]] || { echo -e "${RED}Error: --version requires an argument${NC}"; exit 1; }
       requested_version="$2"
       shift 2
+      ;;
+    --upgrade)
+      upgrade=true
+      shift
+      ;;
+    --show-version)
+      show_version=true
+      shift
       ;;
     -b|--binary)
       [[ -n "${2:-}" ]] || { echo -e "${RED}Error: --binary requires a path${NC}"; exit 1; }
@@ -57,7 +70,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
   esac
-done
+ done
 
 print_message() {
   local level=$1
@@ -67,7 +80,84 @@ print_message() {
   echo -e "${color}${message}${NC}"
 }
 
+LATEST_RELEASE_JSON=""
+LATEST_VERSION=""
+
+fetch_latest_release_json() {
+  if [[ -n "$LATEST_RELEASE_JSON" ]]; then
+    return
+  fi
+  command -v curl >/dev/null 2>&1 || { print_message error "'curl' is required but not installed."; exit 1; }
+  local response
+  if ! response=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest"); then
+    print_message error "Failed to fetch latest release metadata from GitHub."
+    exit 1
+  fi
+  LATEST_RELEASE_JSON="$response"
+}
+
+get_latest_version() {
+  if [[ -n "$LATEST_VERSION" ]]; then
+    printf '%s\n' "$LATEST_VERSION"
+    return 0
+  fi
+  fetch_latest_release_json
+  local tag_line
+  tag_line=$(printf '%s\n' "$LATEST_RELEASE_JSON" | grep -m1 '"tag_name"' || true)
+  if [[ -z "$tag_line" ]]; then
+    return 1
+  fi
+  local parsed
+  parsed=$(printf '%s\n' "$tag_line" | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p')
+  if [[ -z "$parsed" ]]; then
+    return 1
+  fi
+  LATEST_VERSION="$parsed"
+  printf '%s\n' "$LATEST_VERSION"
+}
+
+if [[ "$show_version" == true ]]; then
+  if [[ "$upgrade" == true || -n "$binary_path" || -n "$requested_version" ]]; then
+    print_message error "--show-version cannot be combined with other install options"
+    exit 1
+  fi
+  latest=$(get_latest_version || true)
+  if [[ -z "$latest" ]]; then
+    print_message error "Unable to determine latest version from GitHub."
+    exit 1
+  fi
+  echo "$latest"
+  exit 0
+fi
+
+if [[ "$upgrade" == true ]]; then
+  if [[ -n "$binary_path" ]]; then
+    print_message error "--upgrade cannot be used with --binary"
+    exit 1
+  fi
+  if [[ -n "$requested_version" ]]; then
+    print_message error "--upgrade cannot be combined with --version"
+    exit 1
+  fi
+  latest=$(get_latest_version || true)
+  if [[ -z "$latest" ]]; then
+    print_message error "Unable to determine latest version for upgrade."
+    exit 1
+  fi
+  if command -v "${APP}" >/dev/null 2>&1; then
+    installed_version=$(${APP} --version 2>/dev/null || true)
+    installed_version="${installed_version#v}"
+    if [[ -n "$installed_version" && "$installed_version" == "$latest" ]]; then
+      print_message info "${MUTED}${APP}${NC}${MUTED} is already up to date (${NC}${latest}${MUTED}).${NC}"
+      exit 0
+    fi
+  fi
+  specific_version_override="$latest"
+  requested_version=""
+fi
+
 mkdir -p "$INSTALL_DIR"
+
 
 if [[ -n "$binary_path" ]]; then
   [[ -f "$binary_path" ]] || { print_message error "Binary not found: $binary_path"; exit 1; }
