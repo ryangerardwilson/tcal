@@ -6,7 +6,14 @@ import argparse
 import curses
 import time
 from datetime import date, datetime
+from urllib.error import URLError
 from typing import List, Sequence, cast
+
+import json
+import os
+import urllib.request
+
+from models import parse_datetime as parse_dt_str
 
 from config import load_config
 from editor import edit_event_via_editor
@@ -28,6 +35,14 @@ from keys import (
     KEY_TODAY,
 )
 from models import Event, ValidationError
+
+DEFAULT_EDITOR = "vim"
+DEFAULT_NL_MODEL = "gpt-4o-mini"
+NL_SYSTEM_PROMPT = """
+You are an assistant that converts short natural-language event descriptions into a single calendar event.
+Return JSON with keys: datetime (YYYY-MM-DD HH:MM:SS), event, details (optional string).
+Assume local time. If date/time missing, infer the soonest reasonable future date/time.
+"""
 from state import AppState
 from store import StorageError, load_events, upsert_event
 from ui_base import draw_centered_box, draw_footer, draw_header
@@ -48,6 +63,34 @@ class Orchestrator:
 
     def run(self) -> int:
         return self._run_curses()
+
+    # Natural-language CLI entrypoint
+    def handle_nl_cli(self, text: str) -> int:
+        if not self.config.openai_api_key:
+            print("Missing openai_api_key in config. Please set it in ~/.config/tcal/config.json")
+            return 1
+        try:
+            events = self._nl_to_events(text)
+        except Exception as exc:  # noqa: BLE001
+            print(f"Failed to parse natural-language input: {exc}")
+            return 1
+        try:
+            new_events = self.state.events
+            for ev in events:
+                new_events = upsert_event(
+                    self.config.data_csv_path,
+                    new_events,
+                    ev,
+                    replace_dt=(False, None),
+                )
+            self.state.events = new_events
+            return 0
+        except ValidationError as exc:
+            print(f"Validation error: {exc}")
+            return 1
+        except StorageError as exc:
+            print(f"Storage error: {exc}")
+            return 1
 
     def _run_curses(self) -> int:
         try:
@@ -384,6 +427,63 @@ class Orchestrator:
     def _month_events_for_selected_date(self) -> List[Event]:
         sel_day = self.state.month_selected_date
         return [e for e in self.state.events if e.datetime.date() == sel_day]
+
+    def _nl_to_events(self, text: str) -> List[Event]:
+        body = json.dumps(
+            {
+                "model": DEFAULT_NL_MODEL,
+                "messages": [
+                    {"role": "system", "content": NL_SYSTEM_PROMPT.strip()},
+                    {"role": "user", "content": text},
+                ],
+                "response_format": {"type": "json_schema", "json_schema": {
+                    "name": "event_payload",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "datetime": {"type": "string"},
+                            "event": {"type": "string"},
+                            "details": {"type": "string"},
+                        },
+                        "required": ["datetime", "event"],
+                        "additionalProperties": False,
+                    },
+                }},
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.config.openai_api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req) as resp:
+                raw = resp.read().decode("utf-8")
+        except URLError as exc:  # network error
+            raise RuntimeError(f"Network error calling OpenAI: {exc}") from exc
+
+        try:
+            data = json.loads(raw)
+            content = data["choices"][0]["message"]["content"]
+            payload = json.loads(content)
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Invalid response from OpenAI: {exc}") from exc
+
+        try:
+            ev = Event(
+                datetime=parse_dt_str(payload["datetime"]),
+                event=str(payload["event"]).strip(),
+                details=str(payload.get("details", "")),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Invalid event payload: {exc}") from exc
+
+        return [ev]
 
     def _show_overlay(self, stdscr: "curses.window", message: str, kind: str = "error") -> None:  # type: ignore[name-defined]
         self.state.overlay = "error" if kind == "error" else "message"

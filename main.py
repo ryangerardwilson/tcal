@@ -8,11 +8,19 @@ import sys
 from orchestrator import Orchestrator
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     # Make ESC detection snappy inside curses.
     os.environ.setdefault("ESCDELAY", "25")
 
+    if argv is None:
+        argv = sys.argv[1:]
+
     orchestrator = Orchestrator()
+    if argv:
+        # Natural-language CLI flow: treat all args as a single description.
+        nl_input = " ".join(argv)
+        return orchestrator.handle_nl_cli(nl_input)
+
     return orchestrator.run()
 
 
