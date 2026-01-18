@@ -88,20 +88,23 @@ class MonthView:
     ) -> None:
         evs = self.events_by_date.get(selected_date, [])
         title = f"Events {selected_date.isoformat()}"
-        stdscr.addnstr(y, x, title.ljust(w), w, curses.A_BOLD)
+        usable_w = max(0, w - 1)
+        stdscr.addnstr(y, x, title[:usable_w].ljust(usable_w), usable_w, curses.A_BOLD)
 
         if not evs:
-            stdscr.addnstr(y + 1, x, "(none) — press i to create".ljust(w), w, curses.A_DIM)
+            stdscr.addnstr(y + 1, x, "(none) — press i to create"[:usable_w].ljust(usable_w), usable_w, curses.A_DIM)
             return
 
         body_h = h - 1
+        if usable_w == 0 or body_h <= 0:
+            return
         selected_event_idx = clamp(selected_event_idx, 0, max(0, len(evs) - 1))
         for idx in range(min(body_h, len(evs))):
             ev = evs[idx]
             ts = ev.datetime.strftime("%H:%M")
-            line = f"{ts} {ev.event}"[: w - 1].ljust(w - 1)
+            line = f"{ts} {ev.event}"[:usable_w].ljust(usable_w)
             attr = curses.A_REVERSE if (focus == "events" and idx == selected_event_idx) else 0
-            stdscr.addnstr(y + 1 + idx, x, line, w - 1, attr)
+            stdscr.addnstr(y + 1 + idx, x, line, usable_w, attr)
 
     def move_day(self, selected_date: date, delta_days: int) -> date:
         return selected_date + timedelta(days=delta_days)

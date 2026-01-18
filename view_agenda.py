@@ -33,13 +33,16 @@ class AgendaView:
         elif selected_idx >= scroll + body_h:
             scroll = selected_idx - body_h + 1
 
+        usable_w = max(0, w - 1)
+        if usable_w == 0 or body_h <= 0:
+            return scroll
         for idx in range(body_h):
             line_idx = scroll + idx
             if line_idx >= len(lines):
                 break
             line = lines[line_idx]
             attr = curses.A_REVERSE if line_idx == selected_idx and (self.events or len(lines) == 1) else 0
-            stdscr.addnstr(1 + idx, 0, line.ljust(w), w, attr)
+            stdscr.addnstr(1 + idx, 0, line[:usable_w].ljust(usable_w), usable_w, attr)
         return scroll
 
     def move_selection(self, selected_idx: int, delta: int) -> int:

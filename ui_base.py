@@ -6,14 +6,18 @@ import curses
 from typing import Iterable, Tuple
 
 
-def draw_header(stdscr: "curses._CursesWindow", text: str) -> None:  # type: ignore[name-defined]
+def draw_header(stdscr: "curses.window", text: str) -> None:  # type: ignore[name-defined]
     h, w = stdscr.getmaxyx()
-    stdscr.addnstr(0, 0, text.ljust(w), w)
+    if w <= 0 or h <= 0:
+        return
+    stdscr.addnstr(0, 0, text.ljust(max(1, w - 1)), max(0, w - 1))
 
 
-def draw_footer(stdscr: "curses._CursesWindow", text: str) -> None:  # type: ignore[name-defined]
+def draw_footer(stdscr: "curses.window", text: str) -> None:  # type: ignore[name-defined]
     h, w = stdscr.getmaxyx()
-    stdscr.addnstr(h - 1, 0, text.ljust(w), w)
+    if w <= 0 or h <= 0:
+        return
+    stdscr.addnstr(h - 1, 0, text.ljust(max(1, w - 1)), max(0, w - 1))
 
 
 def draw_centered_box(stdscr: "curses._CursesWindow", lines: Iterable[str]) -> None:  # type: ignore[name-defined]
