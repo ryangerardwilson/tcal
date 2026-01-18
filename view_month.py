@@ -28,7 +28,7 @@ class MonthView:
 
     def render(
         self,
-        stdscr: "curses._CursesWindow",  # type: ignore[name-defined]
+        stdscr: "curses.window",  # type: ignore[name-defined]
         selected_date: date,
         focus: str,
         selected_event_idx: int,
@@ -47,7 +47,7 @@ class MonthView:
         # Draw events pane on right
         self._draw_events_pane(stdscr, 1, grid_w + 1, body_h - 1, right_w, selected_date, focus, selected_event_idx)
 
-    def _draw_grid(self, stdscr: "curses._CursesWindow", y: int, x: int, h: int, w: int, selected_date: date) -> None:  # type: ignore[name-defined]
+    def _draw_grid(self, stdscr: "curses.window", y: int, x: int, h: int, w: int, selected_date: date) -> None:  # type: ignore[name-defined]
         cal = calendar.Calendar(firstweekday=0)
         year, month = selected_date.year, selected_date.month
         weeks = cal.monthdatescalendar(year, month)
@@ -77,7 +77,7 @@ class MonthView:
 
     def _draw_events_pane(
         self,
-        stdscr: "curses._CursesWindow",  # type: ignore[name-defined]
+        stdscr: "curses.window",  # type: ignore[name-defined]
         y: int,
         x: int,
         h: int,

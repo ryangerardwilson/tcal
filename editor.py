@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 import tempfile
 from pathlib import Path
@@ -26,7 +27,8 @@ def edit_event_via_editor(editor_cmd: str, seed_event: Event) -> Tuple[bool, Eve
         json.dump(payload, tmp, indent=2)
         tmp.flush()
     try:
-        proc = subprocess.run([editor_cmd, str(tmp_path)], check=False)
+        cmd = shlex.split(editor_cmd) + [str(tmp_path)]
+        proc = subprocess.run(cmd, check=False)
         if proc.returncode != 0:
             return False, "Editor cancelled or failed"
         try:

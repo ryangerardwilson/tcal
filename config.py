@@ -13,11 +13,11 @@ from paths import ensure_dir, xdg_config_home, xdg_data_home
 
 @dataclass
 class Config:
-    data_parquet_path: Path
+    data_csv_path: Path
     editor: str
 
 
-DEFAULT_DATA_FILENAME = "events.parquet"
+DEFAULT_DATA_FILENAME = "events.csv"
 DEFAULT_EDITOR = "vim"
 CONFIG_FILENAME = "config.json"
 
@@ -43,14 +43,14 @@ def load_config() -> Config:
         except Exception:
             raw = {}
 
-    data_path = Path(raw.get("data_parquet_path") or _default_data_path()).expanduser()
+    data_path = Path(raw.get("data_csv_path") or _default_data_path()).expanduser()
     editor = (raw.get("editor") or os.environ.get("EDITOR") or DEFAULT_EDITOR).strip()
     if not editor:
         editor = DEFAULT_EDITOR
 
     ensure_dir(data_path.parent)
 
-    return Config(data_parquet_path=data_path, editor=editor)
+    return Config(data_csv_path=data_path, editor=editor)
 
 
 __all__ = ["Config", "load_config", "CONFIG_FILENAME"]

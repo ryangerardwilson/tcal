@@ -9,12 +9,15 @@ from orchestrator import Orchestrator
 
 
 def main() -> int:
+    print('a')
     # Make ESC detection snappy inside curses.
     os.environ.setdefault("ESCDELAY", "25")
 
-    orchestrator = Orchestrator()
-    return orchestrator.run(argv=sys.argv[1:])
-
+    try:
+        orchestrator = Orchestrator()
+        orchestrator.run()
+    except Exception as e:
+        print(e)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

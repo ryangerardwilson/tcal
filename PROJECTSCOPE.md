@@ -15,7 +15,7 @@ Tcal is a **Vim-first, terminal-native calendar** written in Python with `curses
 - **Centralized orchestration** – `orchestrator.py` owns argument parsing, curses lifecycle, and mode routing.
 - **Flat layout** – small, single-purpose modules in the repo root until growth justifies folders.
 - **XDG-compliant config** – settings live in `$XDG_CONFIG_HOME/tcal/config.json` (fallback `~/.config/tcal/config.json`).
-- **Inspectable storage** – event data persists as a Parquet file with a stable schema (via PyArrow) at a user-configurable path.
+- **Inspectable storage** – event data persists as a simple CSV file at a user-configurable path (default `~/.local/share/tcal/events.csv`).
 - **Fail-safe terminal handling** – always restore terminal state, never leave users in broken tty mode.
 
 ---
@@ -69,8 +69,9 @@ Anything that requires background services, OAuth, or long-running network conne
    - Tcal serializes the item to JSON with keys `datetime`, `event`, `details`, launches `$EDITOR`, and applies changes if the JSON parses and validates.
 
 4. **Persistence**
-   - Data lives in a Parquet file stored at the path specified in config (`data_parquet_path`).
-   - A storage module (PyArrow-backed) handles load/save, schema validation, and migration warnings.
+    - Data lives in a CSV file stored at the path specified in config (`data_csv_path`).
+    - A storage module (stdlib csv) handles load/save, schema validation, and migration warnings.
+
 
 5. **Help Overlay**
    - `?` displays keybindings, leader commands, and editing tips.
@@ -84,16 +85,16 @@ Anything that requires background services, OAuth, or long-running network conne
 - Example:
 ```json
 {
-  "data_parquet_path": "/home/ryan/.local/share/tcal/events.parquet",
+  "data_csv_path": "/home/ryan/.local/share/tcal/events.csv",
   "editor": "vim"
 }
 ```
-- `data_parquet_path` is required; if missing, default to `~/.local/share/tcal/events.parquet` and ensure directories exist.
+- `data_csv_path` is required; if missing, default to `~/.local/share/tcal/events.csv` and ensure directories exist.
 - `editor` is optional; fallback order: config → `$EDITOR` env → `vim`.
 
-### 6.2 Parquet Schema (PyArrow)
+### 6.2 CSV Schema
 Columns:
-- `datetime` (timestamp[ns]): ISO-formatted local datetime (`YYYY-MM-DD HH:MM:SS`).
+- `datetime` (string): ISO-formatted local datetime (`YYYY-MM-DD HH:MM:SS`).
 - `event` (string): primary description.
 - `details` (string): free-form notes (can be empty).
 
@@ -112,7 +113,7 @@ Constraints:
   }
   ```
 - Vim (or chosen editor) opens in the user’s terminal.
-- When the editor exits with code 0, Tcal re-loads the JSON, validates fields, and writes back to Parquet via PyArrow.
+- When the editor exits with code 0, Tcal re-loads the JSON, validates fields, and writes back to CSV storage.
 - Invalid JSON or schema violations trigger an overlay warning and discard changes.
 
 ---
@@ -152,7 +153,7 @@ Keybindings will become configurable via `config.json`, but defaults must feel g
 
 - Launches instantly (<250ms) and exits cleanly without leaving the terminal raw.
 - Month + Agenda navigation stay responsive (<16ms redraw budget).
-- Parquet file remains valid and deduplicated even after abrupt exits.
+- CSV file remains valid and deduplicated even after abrupt exits.
 - Editing loop (navigate → `i` → edit in Vim → save) works end-to-end without manual file tweaks.
 - Config defaults (data path, editor) resolve automatically if unset, and users can override via config file.
 - Documentation (README + ProjectScope) remains accurate as views evolve.
@@ -162,8 +163,8 @@ Keybindings will become configurable via `config.json`, but defaults must feel g
 ## 10. Roadmap
 
 ### Short-term (v0)
-- Implement config loader with XDG resolution and default Parquet path.
-- Build PyArrow-backed storage module for `datetime/event/details` schema.
+- Implement config loader with XDG resolution and default CSV path.
+- Build CSV-backed storage module for `datetime/event/details` schema.
 - Render Agenda view list with `hjkl` navigation and selection state.
 - Render Month view grid with day selection + peek into day’s events.
 - Implement Vim editing loop for selected agenda/month items (`i`).

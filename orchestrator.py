@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import curses
 import time
-from datetime import date, datetime
-from typing import List, Sequence, cast
+from datetime import date
+from typing import Sequence, cast
 
 from config import load_config
 from editor import edit_event_via_editor
@@ -24,7 +24,7 @@ from keys import (
     KEY_TAB,
     KEY_TODAY,
 )
-from models import Event, ValidationError, event_to_jsonable
+from models import Event, ValidationError
 from state import AppState
 from store import StorageError, load_events, upsert_event
 from ui_base import draw_centered_box, draw_footer, draw_header
@@ -38,34 +38,20 @@ SEEDED_DEFAULT_TIME = "09:00:00"
 class Orchestrator:
     """Owns CLI parsing and the curses lifecycle."""
 
-    def __init__(self, version: str = "0.0.0") -> None:
-        self.version = version
+    def __init__(self) -> None:
         self.config = load_config()
         self.state = AppState()
         self.last_tick_ms = 0
 
-    def run(self, *, argv: Sequence[str]) -> int:
-        parser = argparse.ArgumentParser(prog="tcal")
-        parser.add_argument("--version", action="store_true", help="Show version and exit")
-        parser.add_argument("--help-only", action="store_true", help=argparse.SUPPRESS)
-
-        args = parser.parse_args(list(argv))
-
-        if args.version:
-            print(self.version)
-            return 0
-
-        if args.help_only:
-            parser.print_help()
-            return 0
+    def run(self) -> int:
 
         return self._run_curses()
 
     def _run_curses(self) -> int:
         try:
             curses.wrapper(self._curses_main)
-        except curses.error:
-            return 1
+        except Exception as e:
+            print(e) 
         return 0
 
     def _curses_main(self, stdscr: "curses.window") -> None:  # type: ignore[name-defined]
@@ -75,10 +61,14 @@ class Orchestrator:
 
         # Initial load
         try:
-            self.state.events = load_events(self.config.data_parquet_path)
+            self.state.events = load_events(self.config.data_csv_path)
+            self.state.overlay = "none"
+            self.state.overlay_message = ""
         except StorageError as exc:
-            self._show_overlay(stdscr, f"Storage error: {exc}")
+            self.state.overlay = "error"
+            self.state.overlay_message = f"Storage error: {exc}"
             self.state.events = []
+
 
         self._draw(stdscr)
 
@@ -107,7 +97,7 @@ class Orchestrator:
 
         if self.state.view == "agenda":
             view = AgendaView(self.state.events)
-            view.render(stdscr, self.state.agenda_index, self.state.agenda_scroll)
+            self.state.agenda_scroll = view.render(stdscr, self.state.agenda_index, self.state.agenda_scroll)
         else:
             view = MonthView(self.state.events)
             view.render(
@@ -209,25 +199,30 @@ class Orchestrator:
             self.state.agenda_index = view.move_selection(self.state.agenda_index, -1)
             return True
         if ch == KEY_H:
-            # Jump to previous day: find first event before current selection date
             return self._agenda_jump_day(-1)
         if ch == KEY_L:
-            # Jump to next day
             return self._agenda_jump_day(+1)
         return False
 
-    def _agenda_jump_day(self, delta_days: int) -> bool:
+    def _agenda_jump_day(self, direction: int) -> bool:
         if not self.state.events:
             return False
         cur_idx = self.state.agenda_index
-        cur_ev = self.state.events[cur_idx]
-        target_date = (cur_ev.datetime + (datetime.min - datetime.min.replace(microsecond=0))).date()  # no-op; keep same date
-        target_date = (cur_ev.datetime).date()
-        target_date = target_date.fromordinal(target_date.toordinal() + delta_days)
-        candidates = [i for i, ev in enumerate(self.state.events) if ev.datetime.date() == target_date]
-        if candidates:
-            self.state.agenda_index = candidates[0]
-            return True
+        cur_day = self.state.events[cur_idx].datetime.date()
+        if direction < 0:
+            for idx in range(cur_idx - 1, -1, -1):
+                if self.state.events[idx].datetime.date() < cur_day:
+                    target_day = self.state.events[idx].datetime.date()
+                    first_idx = next(
+                        (i for i, ev in enumerate(self.state.events) if ev.datetime.date() == target_day), idx
+                    )
+                    self.state.agenda_index = first_idx
+                    return True
+        else:
+            for idx in range(cur_idx + 1, len(self.state.events)):
+                if self.state.events[idx].datetime.date() > cur_day:
+                    self.state.agenda_index = idx
+                    return True
         return False
 
     # Month behaviors
@@ -294,9 +289,11 @@ class Orchestrator:
             return False
 
         # Exit curses before launching editor
+        curses.def_prog_mode()
         curses.endwin()
         ok, result = edit_event_via_editor(self.config.editor, seed)
-        stdscr.clear()
+        curses.reset_prog_mode()
+        stdscr.refresh()
         curses.curs_set(0)
         stdscr.nodelay(True)
         stdscr.timeout(100)
@@ -317,7 +314,7 @@ class Orchestrator:
 
         try:
             self.state.events = upsert_event(
-                self.config.data_parquet_path,
+                self.config.data_csv_path,
                 self.state.events,
                 updated,
                 replace_dt=(original is not None, original),
