@@ -33,6 +33,8 @@ from keys import (
     KEY_D,
     KEY_CTRL_H,
     KEY_CTRL_L,
+    KEY_CTRL_J,
+    KEY_CTRL_K,
 )
 from models import Event, ValidationError
 from state import AppState
@@ -175,6 +177,7 @@ class Orchestrator:
                 "dd           delete selected event",
                 "hjkl         navigate (agenda/month)",
                 "Ctrl+h/l     month view: prev/next month",
+                "Ctrl+j/k     month view: next/prev year",
                 "a            toggle agenda/month",
                 "Tab          toggle focus (month view)",
                 "Esc          dismiss overlays",
@@ -390,6 +393,18 @@ class Orchestrator:
                 )
                 self.state.month_event_index = 0
                 return True
+            if ch == KEY_CTRL_K:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, -12
+                )
+                self.state.month_event_index = 0
+                return True
+            if ch == KEY_CTRL_J:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, +12
+                )
+                self.state.month_event_index = 0
+                return True
             if ch == KEY_H:
                 self.state.month_selected_date = view.move_day(
                     self.state.month_selected_date, -1
@@ -436,6 +451,22 @@ class Orchestrator:
             if ch == KEY_CTRL_L:
                 self.state.month_selected_date = view.move_month(
                     self.state.month_selected_date, +1
+                )
+                self.state.month_event_index = 0
+                if not view.events_by_date.get(self.state.month_selected_date):
+                    self.state.month_focus = "grid"
+                return True
+            if ch == KEY_CTRL_K:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, -12
+                )
+                self.state.month_event_index = 0
+                if not view.events_by_date.get(self.state.month_selected_date):
+                    self.state.month_focus = "grid"
+                return True
+            if ch == KEY_CTRL_J:
+                self.state.month_selected_date = view.move_month(
+                    self.state.month_selected_date, +12
                 )
                 self.state.month_event_index = 0
                 if not view.events_by_date.get(self.state.month_selected_date):

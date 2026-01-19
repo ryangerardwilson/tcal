@@ -59,6 +59,7 @@ Natural-language assistants **are now in-scope** when using structured outputs/t
 2. **Navigation**
    - `hjkl` to move day/entry selection.
    - `Ctrl+h/l` in month view for previous/next month.
+   - `Ctrl+j/k` in month view for next/previous year.
    - `Tab` toggles between month grid and day’s events list.
    - `t` jumps to today globally.
 
@@ -123,6 +124,7 @@ Natural-language assistants **are now in-scope** when using structured outputs/t
 | `i`            | view (item) | Edit/create via `$EDITOR` |
 | `dd`           | agenda + month events | Delete selected event |
 | `Ctrl+h` / `Ctrl+l` | month view | Previous / next month |
+| `Ctrl+j` / `Ctrl+k` | month view | Next / previous year |
 | `h/j/k/l`      | agenda + month | Move selection |
 | `Tab`          | month view | Toggle grid vs events focus |
 | `Esc`          | overlays / leader | Dismiss overlays, cancel leader, exit month events focus |

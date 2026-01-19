@@ -44,7 +44,7 @@ If you’d rather run directly from the repo (handy for development or non-Linux
 - **External editing** (`i`) that opens the selected event as JSON in `$EDITOR` (default `vim`)
 - **Natural-language CLI** (e.g. `python main.py "show me today's events"`) with intents for creating, listing, and rescheduling events (absolute or relative time shifts)
 - **Quick delete** by double–tapping `d` (`dd`) in Agenda or the month’s event list
-- **Month jumping** inside the month view with `Ctrl+h` / `Ctrl+l`
+- **Month/Year jumping** inside the month view with `Ctrl+h/l` and `Ctrl+j/k`
 - **CSV-backed storage** with a thin `CalendarService`
 
 ---
@@ -124,6 +124,7 @@ The executor validates OpenAI responses against JSON Schema and surfaces errors 
 | `i`            | view (item) | Edit/create via `$EDITOR` |
 | `dd`           | agenda + month events | Delete selected event |
 | `Ctrl+h` / `Ctrl+l` | month view | Previous / next month |
+| `Ctrl+j` / `Ctrl+k` | month view | Next / previous year |
 | `h/j/k/l`      | agenda + month | Move selection | 
 | `Tab`          | month view | Toggle focus between calendar grid and day’s event list |
 | `Esc`          | overlays / leader | Dismiss help / cancel leader / exit month-event focus |
