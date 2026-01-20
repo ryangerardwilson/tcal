@@ -101,7 +101,7 @@ def _print_help() -> None:
         "  xyz -h           Show this help\n"
         "  xyz -v           Show installed version\n"
         "  xyz -u           Reinstall latest release if newer exists\n"
-        "  xyz -x \"<YYYY-MM-DD HH:MM[:SS]>\" -y \"<outcome>\" [-z \"<impact>\"]\n"
+        "  xyz -x \"<YYYY-MM-DD HH:MM[:SS]>\" -y \"<outcome>\" -z \"<impact>\"\n"
     )
 
 
@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
     orchestrator = Orchestrator()
 
     if "x" in flag_values or "y" in flag_values or "z" in flag_values:
-        missing = [flag for flag in ("x", "y") if flag_values.get(flag) is None]
+        missing = [flag for flag in ("x", "y", "z") if flag_values.get(flag) is None]
         if missing:
             print(f"Missing required flag(s): {', '.join(f'-{flag}' for flag in missing)}")
             return 1

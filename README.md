@@ -93,12 +93,12 @@ Use the deterministic flags whenever you want to script or quickly log a task:
 
 ```
 python main.py -x "2026-01-26 00:00" -y "learned to cook pasta" -z "throw a nice party"
-python main.py -x "2026-02-01 09:00" -y "ship launch blog"            # impact defaults to ""
+python main.py -x "2026-02-01 09:00" -y "ship launch blog" -z "prep launch recap"
 ```
 
 - `-x` (required): trigger timestamp (`YYYY-MM-DD HH:MM[:SS]`). Seconds are optional.
 - `-y` (required): outcome text.
-- `-z` (optional): impact text; defaults to an empty string if omitted.
+- `-z` (required): impact text.
 
 Successful commands print the stored JSON payload. Validation/storage failures return exit code `1` with a descriptive error.
 

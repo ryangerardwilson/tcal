@@ -62,17 +62,21 @@ def normalize_event_payload(data: dict) -> Event:
     # Accept legacy keys but prefer x/y/z going forward
     x_value = data.get("x", data.get("datetime"))
     y_value = data.get("y", data.get("event"))
-    z_value = data.get("z", data.get("details", ""))
+    z_value = data.get("z", data.get("details"))
 
     if x_value is None or y_value is None:
         raise ValidationError("Missing 'x' (datetime) or 'y' (outcome) field")
+    if z_value is None:
+        raise ValidationError("Missing 'z' (impact) field")
 
     dt = parse_datetime(str(x_value))
     outcome = str(y_value).strip()
     if not outcome:
         raise ValidationError("'y' (outcome) cannot be empty")
 
-    impact = str(z_value)
+    impact = str(z_value).strip()
+    if not impact:
+        raise ValidationError("'z' (impact) cannot be empty")
     return Event(x=dt, y=outcome, z=impact)
 
 
