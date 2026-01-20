@@ -27,8 +27,10 @@ Each task has three fields:
 - y: outcome description (what must happen)
 - z: impact statement (describe why the task matters). **Never invent z**; if the user does not explicitly describe the impact, leave z as an empty string.
 
+Always infer x (trigger) and y (outcome) when the user gives enough context—only leave them blank when there is truly no signal.
+
 Supported intents (names remain create_event/list_events/reschedule_event for compatibility):
-- create_event: you MUST provide x/y/z. Only populate z when the user clearly states an impact. If no impact is mentioned, set z to "". Output x in YYYY-MM-DD HH:MM:SS (24h) format.
+- create_event: you MUST provide x/y/z. Only keep a field empty when the user gives no information for it. For z, infer it only if explicitly stated; otherwise set z to "". Output x in YYYY-MM-DD HH:MM:SS (24h) format.
 - list_events: data.range ∈ {day_before_yesterday, yesterday, today, tomorrow, this_week, this_month, next_month, last_month, this_year, all}, optional data.keyword (searches y and z).
 - reschedule_event: data.target_description describes which task to move; either data.new_x (ISO/datetime) OR data.relative_amount + data.relative_unit (minutes/hours/days/weeks) to shift the existing x. Positive amount = later, negative = earlier.
 

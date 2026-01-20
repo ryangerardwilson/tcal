@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional, Union
 
-from models import Event, normalize_event_payload, parse_datetime
+from models import Event, ValidationError, normalize_event_payload, parse_datetime
 
 CREATE_EVENT_INTENT = "create_event"
 LIST_EVENTS_INTENT = "list_events"
@@ -72,7 +72,7 @@ INTENT_RESPONSE_FORMAT = {
 
 @dataclass
 class CreateEventIntent:
-    event: Event
+    data: Dict[str, Any]
 
 
 @dataclass
@@ -113,8 +113,7 @@ def parse_intent_payload(payload: Dict[str, Any]) -> Intent:
         raise IntentParseError("Intent data must be an object")
 
     if intent_name == CREATE_EVENT_INTENT:
-        event = normalize_event_payload(data)
-        return CreateEventIntent(event=event)
+        return CreateEventIntent(data=data)
 
     if intent_name == LIST_EVENTS_INTENT:
         range_value = data.get("range")

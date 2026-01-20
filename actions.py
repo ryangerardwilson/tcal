@@ -15,7 +15,7 @@ from intents import (
     RescheduleEventIntent,
     RelativeAdjustment,
 )
-from models import Event, ValidationError
+from models import Event, ValidationError, normalize_event_payload, parse_datetime
 from store import StorageError
 
 
@@ -32,7 +32,7 @@ class ActionError(Exception):
 
 def _missing_components(event: Event) -> list[str]:
     missing: list[str] = []
-    if not getattr(event, "x", None):
+    if not event.x:
         missing.append("x (trigger)")
     if not event.y.strip():
         missing.append("y (outcome)")
@@ -82,7 +82,35 @@ def handle_create_event(
     *,
     existing_events: List[Event],
 ) -> ActionResult:
-    created = intent.event
+    raw_data = intent.data
+    created: Event | None = None
+    create_error: str | None = None
+    try:
+        created = normalize_event_payload(raw_data)
+    except ValidationError as exc:
+        create_error = str(exc)
+
+    if created is None:
+        # Determine which components are missing/invalid for better feedback
+        missing = []
+        raw_x = raw_data.get("x") or raw_data.get("datetime")
+        raw_y = raw_data.get("y") or raw_data.get("event")
+        raw_z = raw_data.get("z") or raw_data.get("details")
+        if not raw_x:
+            missing.append("x (trigger)")
+        if not str(raw_y or "").strip():
+            missing.append("y (outcome)")
+        if not str(raw_z or "").strip():
+            missing.append("z (impact)")
+        if not missing and create_error:
+            return ActionResult(False, create_error)
+        placeholder_event = Event(
+            x=parse_datetime(raw_x or "1970-01-01 00:00:00"),
+            y=str(raw_y or "(unspecified outcome)"),
+            z=str(raw_z or ""),
+        )
+        return ActionResult(False, _format_missing_component_message(placeholder_event, missing or ["x (trigger)"]))
+
     missing = _missing_components(created)
     if missing:
         return ActionResult(success=False, message=_format_missing_component_message(created, missing))
