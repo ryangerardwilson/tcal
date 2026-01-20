@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Iterable, List
 
 from calendar_service import CalendarService
@@ -52,26 +52,42 @@ def _infer_impact_clause(outcome: str) -> str:
     return "unlock new opportunities and turn this effort into tangible momentum"
 
 
-def _format_missing_component_message(event: Event, missing: list[str]) -> str:
-    trigger_human = event.x.strftime("%B %d, %Y") if getattr(event, "x", None) else "a clear date"
-    trigger_exact = event.x.strftime("%Y-%m-%d %H:%M:%S") if getattr(event, "x", None) else "(unspecified)"
+def _format_missing_component_message(
+    event: Event,
+    missing: list[str],
+    *,
+    raw_x: str | None = None,
+) -> str:
+    x_missing = "x (trigger)" in missing or not raw_x
+    if x_missing:
+        trigger_human = "your chosen deadline"
+        trigger_exact = None
+    else:
+        trigger_human = event.x.strftime("%B %d, %Y")
+        trigger_exact = event.x.strftime("%Y-%m-%d %H:%M:%S")
     outcome = event.y.strip() or "finish this task"
-    missing_list = ", ".join(missing)
+    missing_entries = [f"    {item}" for item in missing] if missing else ["    (none)"]
     impact_clause = _infer_impact_clause(outcome)
     suggestion = (
         f"\"When {trigger_human} arrives, I want to {outcome.lower()} "
         f"so I can {impact_clause}.\""
     )
+    parsed_lines = []
+    if not x_missing and trigger_exact:
+        parsed_lines.append(f"    x = {trigger_exact}")
+    if "y (outcome)" not in missing and event.y.strip():
+        parsed_lines.append(f"    y = '{event.y}'")
+    if "z (impact)" not in missing and event.z.strip():
+        parsed_lines.append(f"    z = '{event.z}'")
     lines = [
         "-------------------------------------",
         "Task not created (missing components)",
         "-------------------------------------",
-        f"• Missing: {missing_list}",
-        f"• Parsed:",
-        f"    x = {trigger_exact}",
-        f"    y = '{event.y}'",
-        "• Suggested rephrase:",
-        f"    {suggestion}",
+        "• Missing:"
+    ] + missing_entries + [
+        "• Parsed:",
+    ] + parsed_lines + [
+        f"• Suggested rephrase: {suggestion}",
     ]
     return "\n".join(lines)
 
@@ -105,11 +121,18 @@ def handle_create_event(
         if not missing and create_error:
             return ActionResult(False, create_error)
         placeholder_event = Event(
-            x=parse_datetime(raw_x or "1970-01-01 00:00:00"),
+            x=parse_datetime(raw_x or date.today().strftime("%Y-%m-%d 00:00:00")),
             y=str(raw_y or "(unspecified outcome)"),
             z=str(raw_z or ""),
         )
-        return ActionResult(False, _format_missing_component_message(placeholder_event, missing or ["x (trigger)"]))
+        return ActionResult(
+            False,
+            _format_missing_component_message(
+                placeholder_event,
+                missing or ["x (trigger)"],
+                raw_x=raw_x,
+            ),
+        )
 
     missing = _missing_components(created)
     if missing:
