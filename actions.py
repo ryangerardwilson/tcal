@@ -154,7 +154,7 @@ def handle_create_event(
     pretty = json.dumps(payload, indent=2)
     return ActionResult(
         success=True,
-        message=f"Task created:\n{pretty}",
+        message=pretty,
         events=updated,
     )
 
