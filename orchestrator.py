@@ -433,6 +433,10 @@ class Orchestrator:
                     return True
                 return False
         else:  # focus == events
+            if ch in (KEY_H, KEY_L, KEY_CTRL_H, KEY_CTRL_L, KEY_CTRL_J, KEY_CTRL_K):
+                self.state.month_focus = "grid"
+                self.state.month_event_index = 0
+                return self._handle_month_keys(ch)
             if ch == KEY_TAB:
                 return False
             if ch == KEY_CTRL_H:
