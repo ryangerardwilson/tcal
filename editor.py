@@ -43,10 +43,31 @@ def edit_event_via_editor(
             data = json.loads(tmp_path.read_text())
             if isinstance(data, dict):
                 data = [data]
-            updated_events = [normalize_event_payload(item) for item in data]
+
+            def _trim(value: object) -> str:
+                if value is None:
+                    return ""
+                return str(value).strip()
+
+            updated_events = []
+            for item in data:
+                x_str = _trim(item.get("x", item.get("datetime")))
+                y_str = _trim(item.get("y", item.get("event")))
+                z_str = _trim(item.get("z", item.get("details", "")))
+
+                # Treat fully empty payloads (or blank y) as a cancelled edit
+                if not x_str and not y_str and not z_str:
+                    continue
+                if not y_str:
+                    continue
+
+                normalized_input = {"x": x_str, "y": y_str, "z": z_str}
+                updated_events.append(normalize_event_payload(normalized_input))
+
             return True, updated_events
         except ValidationError as exc:
             return False, str(exc)
+
         except Exception as exc:  # noqa: BLE001
             return False, f"Invalid JSON: {exc}"
     finally:
