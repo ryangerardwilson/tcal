@@ -59,9 +59,12 @@ def _format_missing_component_message(
     *,
     raw_x: str | None = None,
 ) -> str:
-    x_missing = "x (trigger)" in missing or not raw_x
+    x_missing = "x (trigger)" in missing
     if x_missing:
-        trigger_human = "your chosen deadline"
+        if raw_x:
+            trigger_human = raw_x
+        else:
+            trigger_human = "your chosen deadline"
         trigger_exact = None
     else:
         trigger_human = event.x.strftime("%B %d, %Y")
@@ -76,6 +79,8 @@ def _format_missing_component_message(
     parsed_lines = []
     if not x_missing and trigger_exact:
         parsed_lines.append(f"    x = {trigger_exact}")
+    elif raw_x:
+        parsed_lines.append(f"    x = {raw_x}")
     if "y (outcome)" not in missing and event.y.strip():
         parsed_lines.append(f"    y = '{event.y}'")
     if "z (impact)" not in missing and event.z.strip():
