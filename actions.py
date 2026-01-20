@@ -59,43 +59,41 @@ def _format_missing_component_message(
     *,
     raw_x: str | None = None,
 ) -> str:
-    x_missing = "x (trigger)" in missing
-    if x_missing:
-        if raw_x:
-            trigger_human = raw_x
-        else:
-            trigger_human = "your chosen deadline"
-        trigger_exact = None
-    else:
-        trigger_human = event.x.strftime("%B %d, %Y")
-        trigger_exact = event.x.strftime("%Y-%m-%d %H:%M:%S")
-    outcome = event.y.strip() or "finish this task"
-    missing_entries = [f"    {item}" for item in missing] if missing else ["    (none)"]
-    impact_clause = _infer_impact_clause(outcome)
-    suggestion = (
-        f"\"When {trigger_human} arrives, I want to {outcome.lower()} "
-        f"so I can {impact_clause}.\""
-    )
-    parsed_lines = []
-    if not x_missing and trigger_exact:
-        parsed_lines.append(f"    x = {trigger_exact}")
-    elif raw_x:
-        parsed_lines.append(f"    x = {raw_x}")
-    if "y (outcome)" not in missing and event.y.strip():
-        parsed_lines.append(f"    y = '{event.y}'")
-    if "z (impact)" not in missing and event.z.strip():
-        parsed_lines.append(f"    z = '{event.z}'")
-    lines = [
-        "-------------------------------------",
-        "Task not created (missing components)",
-        "-------------------------------------",
-        "• Missing:"
-    ] + missing_entries + [
-        "• Parsed:",
-    ] + parsed_lines + [
-        f"• Suggested rephrase: {suggestion}",
-    ]
-    return "\n".join(lines)
+    def _normalize_missing(entries: list[str]) -> list[str]:
+        mapping = {
+            "x (trigger)": "x",
+            "y (outcome)": "y",
+            "z (impact)": "z",
+        }
+        normalized = []
+        for item in entries:
+            normalized.append(mapping.get(item, item))
+        return normalized
+
+    def _format_x_value() -> str:
+        if "x (trigger)" in missing:
+            return raw_x or ""
+        return event.x.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _format_y_value() -> str:
+        if "y (outcome)" in missing:
+            return ""
+        return event.y.strip()
+
+    def _format_z_value() -> str:
+        if "z (impact)" in missing:
+            return ""
+        return event.z.strip()
+
+    payload = {
+        "missing": _normalize_missing(missing),
+        "parsed": {
+            "x": _format_x_value(),
+            "y": _format_y_value(),
+            "z": _format_z_value(),
+        },
+    }
+    return json.dumps(payload, indent=2)
 
 
 def handle_create_event(
