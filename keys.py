@@ -26,10 +26,6 @@ KEY_J = ord("j")
 KEY_K = ord("k")
 KEY_L = ord("l")
 
-KEY_CAP_J = ord("J")
-KEY_CAP_K = ord("K")
-
-
 __all__ = [
     "KEY_Q",
     "KEY_CAP_Q",
@@ -50,6 +46,4 @@ __all__ = [
     "KEY_J",
     "KEY_K",
     "KEY_L",
-    "KEY_CAP_J",
-    "KEY_CAP_K",
 ]

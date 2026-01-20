@@ -8,7 +8,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from paths import ensure_dir, xdg_config_home
 
@@ -16,8 +16,6 @@ from paths import ensure_dir, xdg_config_home
 @dataclass
 class Config:
     data_csv_path: Path
-    openai_api_key: Optional[str]
-    openai_model: Optional[str]
 
 
 DEFAULT_DATA_FILENAME = "event.csv"
@@ -53,15 +51,11 @@ def load_config() -> Config:
             raw = {}
 
     data_path = Path(raw.get("data_csv_path") or _default_data_path()).expanduser()
-    openai_api_key = raw.get("openai_api_key")
-    openai_model = raw.get("model")
 
     ensure_dir(data_path.parent)
 
     return Config(
         data_csv_path=data_path,
-        openai_api_key=openai_api_key,
-        openai_model=openai_model,
     )
 
 

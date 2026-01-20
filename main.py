@@ -8,6 +8,7 @@ import subprocess
 import sys
 from typing import Sequence
 
+from models import ValidationError
 from orchestrator import Orchestrator
 
 try:
@@ -53,33 +54,58 @@ def _print_help() -> None:
     print(
         "tcal - terminal-native keyboard-first calendar\n\n"
         "Usage:\n"
-        "  tcal                 Launch curses UI\n"
-        "  tcal --version       Show installed version\n"
-        "  tcal --upgrade       Reinstall latest release if newer exists\n"
-        "  tcal <natural text>  Run natural-language CLI query\n"
+        "  tcal              Launch curses UI\n"
+        "  tcal -h           Show this help\n"
+        "  tcal -v           Show installed version\n"
+        "  tcal -u           Reinstall latest release if newer exists\n"
+        "  tcal -x \"<YYYY-MM-DD HH:MM[:SS]>\" -y \"<outcome>\" [-z \"<impact>\"]\n"
     )
 
 
-def parse_args(argv: Sequence[str]) -> tuple[list[str], bool, bool, bool]:
-    remaining: list[str] = []
+def parse_args(argv: Sequence[str]) -> tuple[dict[str, str | None], bool, bool, bool]:
+    flags: dict[str, str | None] = {}
     show_version = False
     show_help = False
     do_upgrade = False
 
-    skip_next = False
-    for idx, arg in enumerate(argv):
-        if skip_next:
-            skip_next = False
-            continue
-        if arg in {"-h", "--help"}:
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == "-h":
             show_help = True
-        elif arg in {"-V", "--version"}:
+            idx += 1
+            continue
+        if arg == "-v":
             show_version = True
-        elif arg == "--upgrade":
+            idx += 1
+            continue
+        if arg == "-u":
             do_upgrade = True
-        else:
-            remaining.append(arg)
-    return remaining, show_version, show_help, do_upgrade
+            idx += 1
+            continue
+        if arg == "-x":
+            idx += 1
+            if idx >= len(argv):
+                raise ValidationError("-x requires a datetime argument")
+            flags["x"] = argv[idx]
+            idx += 1
+            continue
+        if arg == "-y":
+            idx += 1
+            if idx >= len(argv):
+                raise ValidationError("-y requires an outcome argument")
+            flags["y"] = argv[idx]
+            idx += 1
+            continue
+        if arg == "-z":
+            idx += 1
+            if idx >= len(argv):
+                raise ValidationError("-z requires an impact argument")
+            flags["z"] = argv[idx]
+            idx += 1
+            continue
+        raise ValidationError(f"Unknown flag '{arg}'")
+    return flags, show_version, show_help, do_upgrade
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -89,7 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
-    remaining, show_version, show_help, do_upgrade = parse_args(argv)
+    try:
+        flag_values, show_version, show_help, do_upgrade = parse_args(argv)
+    except ValidationError as exc:
+        print(str(exc))
+        return 1
 
     if show_version:
         print(__version__)
@@ -103,10 +133,16 @@ def main(argv: list[str] | None = None) -> int:
         return _run_upgrade()
 
     orchestrator = Orchestrator()
-    if remaining:
-        # Natural-language CLI flow: treat all remaining args as a single description.
-        nl_input = " ".join(remaining)
-        return orchestrator.handle_nl_cli(nl_input)
+
+    if "x" in flag_values or "y" in flag_values or "z" in flag_values:
+        missing = [flag for flag in ("x", "y") if flag_values.get(flag) is None]
+        if missing:
+            print(f"Missing required flag(s): {', '.join(f'-{flag}' for flag in missing)}")
+            return 1
+        x_val = flag_values.get("x") or ""
+        y_val = flag_values.get("y") or ""
+        z_val = flag_values.get("z") or ""
+        return orchestrator.handle_structured_cli(x_val, y_val, z_val)
 
     return orchestrator.run()
 

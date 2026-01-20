@@ -5,11 +5,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import List, Literal, Optional
+from typing import Literal, Optional, List
 
 from models import Event
 
 ViewName = Literal["agenda", "month"]
+
 FocusName = Literal["grid", "events"]
 OverlayKind = Literal["none", "help", "error", "message"]
 

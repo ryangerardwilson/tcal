@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-`tcal` is a **Vim-first, terminal-native task tracker** written in Python with `curses`. It focuses on keyboard workflows for inspecting schedules, runs entirely in the terminal, and now includes an optional natural-language CLI powered by OpenAI structured outputs. Tasks are defined by three fields: trigger `x` (timestamp), outcome `y`, and impact `z` (optional).
+`tcal` is a **Vim-first, terminal-native task tracker** written in Python with `curses`. It focuses on keyboard workflows for inspecting schedules, runs entirely in the terminal, and supports deterministic CLI commands built around x/y/z tasks. Tasks are defined by three fields: trigger `x` (timestamp), outcome `y`, and impact `z` (optional).
 
 ---
 
@@ -12,12 +12,12 @@
 - **Direct view toggling** – single-key `a` flips between agenda and month views; leader remains available for future chords (currently unused).
 - **External editing via Vim** – pressing `i` dumps the selected task (x/y/z) to JSON, opens `$EDITOR` (default `vim`), then re-imports the edited JSON.
 - **Thin entrypoint** – `main.py` must stay tiny.
-- **Central orchestrator** – `orchestrator.py` handles CLI parsing, curses lifecycle, NL CLI entry, and the between-view policy.
-- **Flat layout** – small modules at repo root (`calendar_service.py`, `nl_executor.py`, `actions.py`, etc.).
+- **Central orchestrator** – `orchestrator.py` handles CLI parsing, curses lifecycle, structured CLI handling, and the between-view policy.
+- **Flat layout** – small modules at repo root (`calendar_service.py`, etc.).
 - **XDG-friendly config** – `$XDG_CONFIG_HOME/tcal/config.json` (fallback `~/.config/tcal/config.json`).
 - **Inspectable storage** – tasks stored in a CSV with x/y/z columns (default `$XDG_DATA_HOME/tcal/event.csv`, fallback `~/.tcal/event.csv`).
 - **Safe terminal handling** – always restore terminal state on exit.
-- **Structured natural-language intents** – OpenAI client uses JSON schema + tool-ready architecture for create/list/reschedule commands.
+- **Deterministic x/y/z flow** – CLI, TUI, and storage all share the same three-field contract.
 
 ---
 
@@ -30,7 +30,7 @@
 - Multi-user collaboration or sharing.
 - Anything that requires background jobs or OAuth (until priorities change).
 
-Natural-language assistants **are now in-scope** when using structured outputs/tool calling; free-form conversational agents remain out-of-scope for v0.
+Natural-language assistants are currently out-of-scope; the CLI focuses on deterministic x/y/z commands.
 
 ---
 
@@ -42,10 +42,10 @@ Natural-language assistants **are now in-scope** when using structured outputs/t
 - Exit with orchestrator’s return code.
 
 ### `orchestrator.py`
-- Load config (data path, OpenAI key/model).
-- Determine mode: curses UI or natural-language CLI when args are provided.
+- Load config (data path).
+- Determine mode: curses UI or structured CLI when flags are provided.
 - Manage `CalendarService`, `MonthView`, `AgendaView`, and the leader/overlay state machine.
-- Handle `dd` deletion flow, `Ctrl+h/l` month shifts, and NL executor errors.
+- Handle `dd` deletion flow and month navigation.
 
 `main.py` must remain slim; orchestration/logging/routing lives in `orchestrator.py`.
 
@@ -72,9 +72,9 @@ Natural-language assistants **are now in-scope** when using structured outputs/t
 5. **Persistence**
    - `calendar_service.py` loads/saves CSV, handles upserts, deletes (now x/y/z tasks).
 
-6. **Natural-language CLI**
-   - `nl_executor.py` + `openai_client.py` parse create/list/reschedule intents using JSON schema.
-   - `actions.py` executes intents (create event, filter lists by date range/keyword, reschedule via absolute or relative adjustments).
+6. **Structured CLI**
+   - `main.py` parses `-x/-y/-z` flags and delegates to `Orchestrator.handle_structured_cli`.
+   - The handler validates input, applies storage updates, and prints the resulting x/y/z JSON.
 
 7. **Help overlay (`?`)**
    - Lists the current shortcuts (global, leader, delete, month jumps, etc.).
@@ -84,14 +84,12 @@ Natural-language assistants **are now in-scope** when using structured outputs/t
 ## 6. Configuration & Storage
 
 ### Config (`config.json`)
-- Fields: `data_csv_path`, `openai_api_key`, `model` (optional). Trailing commas tolerated.
+- Fields: `data_csv_path` (optional). Trailing commas tolerated.
 - Default data path: `$XDG_DATA_HOME/tcal/event.csv` (fallback `~/.tcal/event.csv`).
 - Example:
   ```json
   {
-    "data_csv_path": "/home/example/.local/share/tcal/event.csv",
-    "openai_api_key": "sk-proj-...",
-    "model": "gpt-4o-mini"
+    "data_csv_path": "/home/example/.local/share/tcal/event.csv"
   }
   ```
 
@@ -138,7 +136,7 @@ Leader sequences may expand (week/day views) post-v0.
 
 - UI remains responsive (<16ms redraw) in both views.
 - Editing loop (navigate → `i` → edit JSON → save) works end-to-end.
-- Natural-language CLI handles create/list/reschedule intents reliably, with clear errors when OpenAI rejects a request.
+- Structured CLI validates x/y/z fields and surfaces clear errors when input is invalid.
 - Config defaults resolve automatically; trailing commas don’t break parsing.
 - Documentation (README + ProjectScope) matches actual behavior.
 
@@ -147,14 +145,13 @@ Leader sequences may expand (week/day views) post-v0.
 ## 10. Roadmap
 
 ### Short-term
-- Polish natural-language intents (additional ranges, better disambiguation).
-- Add tests for `calendar_service`, `actions`, and `nl_executor`.
+- Add tests for `calendar_service` and structured CLI flows.
 - Improve month view layout (weekday headers, spacing, dynamic event panes). ✔️
 
 ### Medium-term
 - Add week/day views (` ,w `/` ,d `) reusing Agenda/Month patterns.
 - Provide ICS export/import utilities.
-- Expand NL executor with tool-calling (list/search/reschedule dialogs).
+- Expand CLI ergonomics (bulk operations, templates, etc.).
 - Expose configurable keybindings via config.
 
 ### Deferred

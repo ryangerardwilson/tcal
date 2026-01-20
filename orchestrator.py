@@ -4,20 +4,23 @@
 from __future__ import annotations
 
 import curses
+import json
+import os
 import time
-from datetime import date, timedelta
+from datetime import date
 from typing import List, cast
 
 from calendar_service import CalendarService, StorageError
 from config import load_config
 from editor import edit_event_via_editor
-from nl_executor import NaturalLanguageExecutor
-from openai_client import OpenAIClient, DEFAULT_MODEL as OPENAI_DEFAULT_MODEL
-
-DEFAULT_EDITOR = "vim"
-
 from keys import (
+    KEY_A,
     KEY_CAP_Q,
+    KEY_CTRL_H,
+    KEY_CTRL_J,
+    KEY_CTRL_K,
+    KEY_CTRL_L,
+    KEY_D,
     KEY_ESC,
     KEY_H,
     KEY_HELP,
@@ -26,18 +29,12 @@ from keys import (
     KEY_K,
     KEY_L,
     KEY_LEADER,
-    KEY_A,
     KEY_N,
     KEY_Q,
     KEY_TAB,
     KEY_TODAY,
-    KEY_D,
-    KEY_CTRL_H,
-    KEY_CTRL_L,
-    KEY_CTRL_J,
-    KEY_CTRL_K,
 )
-from models import Event, ValidationError
+from models import Event, ValidationError, normalize_event_payload
 from state import AppState
 from ui_base import draw_centered_box, draw_footer
 from view_agenda import AgendaView
@@ -65,33 +62,29 @@ class Orchestrator:
     def run(self) -> int:
         return self._run_curses()
 
-    # Natural-language CLI entrypoint
-    def handle_nl_cli(self, text: str) -> int:
-        if not self.config.openai_api_key:
-            print(
-                "Missing openai_api_key in config. Please set it in ~/.config/tcal/config.json"
-            )
+    def handle_structured_cli(self, x_str: str, y_str: str, z_str: str) -> int:
+        payload = {"x": x_str, "y": y_str, "z": z_str}
+        try:
+            event = normalize_event_payload(payload)
+        except ValidationError as exc:
+            print(str(exc))
             return 1
 
         try:
             existing = self.calendar.load_events()
-        except StorageError as exc:
-            print(f"Storage error: {exc}")
+            updated = self.calendar.upsert_event(existing, event)
+        except (ValidationError, StorageError) as exc:
+            print(str(exc))
             return 1
 
-        model = self.config.openai_model or OPENAI_DEFAULT_MODEL
-        client = OpenAIClient(
-            self.config.openai_api_key,
-            model=model,
-        )
-        executor = NaturalLanguageExecutor(client, self.calendar)
-        result = executor.execute(text, existing_events=existing)
-
-        print(result.message)
-        if result.success and result.events is not None:
-            self.state.events = result.events
-            return 0
-        return 1
+        output = {
+            "x": event.x.strftime("%Y-%m-%d %H:%M:%S"),
+            "y": event.y,
+            "z": event.z,
+        }
+        print(json.dumps(output, indent=2))
+        self.state.events = updated
+        return 0
 
     def _run_curses(self) -> int:
         try:
@@ -540,8 +533,10 @@ class Orchestrator:
         # Exit curses before launching editor
         curses.def_prog_mode()
         curses.endwin()
-        ok, result = edit_event_via_editor(DEFAULT_EDITOR, payload)
+        editor_cmd = os.environ.get("EDITOR", "vim")
+        ok, result = edit_event_via_editor(editor_cmd, payload)
         curses.reset_prog_mode()
+
         stdscr.refresh()
         curses.curs_set(0)
         stdscr.nodelay(True)
