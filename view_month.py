@@ -5,11 +5,54 @@ from __future__ import annotations
 
 import calendar
 import curses
-from datetime import date, timedelta
-from typing import Dict, List
+import textwrap
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Set, Tuple
 
 from models import Event
 from ui_base import clamp
+
+
+def _max_line_length(text: str) -> int:
+    if not text:
+        return 0
+    lines = text.splitlines()
+    if not lines:
+        return len(text)
+    return max(len(line) for line in lines)
+
+
+def _wrap_text(value: str, width: int) -> List[str]:
+    if width <= 0:
+        return [""]
+    text = "" if value is None else str(value)
+    parts = text.splitlines() or [text]
+    lines: List[str] = []
+    for part in parts:
+        if part == "":
+            lines.append("")
+            continue
+        wrapped = textwrap.wrap(
+            part,
+            width=width,
+            break_long_words=True,
+            drop_whitespace=False,
+            replace_whitespace=False,
+        )
+        if not wrapped:
+            lines.append("")
+        else:
+            lines.extend(wrapped)
+    return lines or [""]
+
+
+def _event_identity(event: Event) -> Tuple[str, datetime, str, str]:
+    return (
+        event.bucket,
+        event.coords.x,
+        event.coords.y,
+        event.coords.z,
+    )
 
 
 class MonthView:
@@ -33,6 +76,10 @@ class MonthView:
         selected_date: date,
         focus: str,
         selected_event_idx: int,
+        *,
+        expand_all: bool,
+        row_overrides: Set[Tuple[str, datetime, str, str]],
+        bucket_label: str,
     ) -> None:
         h, w = stdscr.getmaxyx()
         body_h = h - 1
@@ -86,6 +133,9 @@ class MonthView:
                 selected_date,
                 focus,
                 selected_event_idx,
+                expand_all,
+                row_overrides,
+                bucket_label,
             )
 
     def _grid_required_rows(self, selected_date: date) -> int:
@@ -172,30 +222,188 @@ class MonthView:
         selected_date: date,
         focus: str,
         selected_event_idx: int,
+        expand_all: bool,
+        row_overrides: Set[Tuple[str, datetime, str, str]],
+        bucket_label: str,
     ) -> None:
         evs = self.events_by_date.get(selected_date, [])
-        if not evs:
-            return
-
-        title = f"Tasks {selected_date.isoformat()}"
+        title_suffix = f" — bucket: {bucket_label}" if bucket_label else ""
         usable_w = max(0, w - 1)
-        stdscr.addnstr(y, x, title[:usable_w].ljust(usable_w), usable_w, curses.A_BOLD)
+        stdscr.addnstr(
+            y,
+            x,
+            f"Tasks {selected_date.isoformat()}{title_suffix}"[:usable_w].ljust(usable_w),
+            usable_w,
+            curses.A_BOLD,
+        )
 
-        body_h = h - 1
-        if usable_w == 0 or body_h <= 0:
+        body_h = h - 2
+        if usable_w <= 0 or body_h <= 0:
             return
-        selected_event_idx = clamp(selected_event_idx, 0, max(0, len(evs) - 1))
-        for idx in range(min(body_h, len(evs))):
-            ev = evs[idx]
-            ts = ev.coords.x.strftime("%H:%M")
-            impact = f" — {ev.coords.z}" if ev.coords.z else ""
-            line = f"{ts} {ev.coords.y}{impact}"[:usable_w].ljust(usable_w)
-            attr = (
-                curses.A_REVERSE
-                if (focus == "events" and idx == selected_event_idx)
-                else 0
+        events = evs
+        if not events:
+            stdscr.addnstr(y + 1, x, "(no tasks)"[:usable_w].ljust(usable_w), usable_w, curses.A_DIM)
+            return
+
+        timestamps = [ev.coords.x.strftime("%H:%M") for ev in events]
+        y_values = [ev.coords.y for ev in events]
+        z_values = [ev.coords.z for ev in events]
+
+        max_x_len = max((len(val) for val in timestamps), default=len("x"))
+        max_y_len = max((_max_line_length(val) for val in y_values), default=len("y"))
+        max_z_len = max((_max_line_length(val) for val in z_values), default=len("z"))
+
+        min_x, max_x = 5, 12
+        min_y, max_y = 6, 60
+        min_z, max_z = 6, 40
+        gap = 1
+
+        x_width = max(min_x, min(max_x, max(len("x"), max_x_len)))
+        y_width = max(min_y, min(max_y, max(len("y"), max_y_len)))
+        z_width = max(min_z, min(max_z, max(len("z"), max_z_len)))
+
+        widths = [x_width, y_width, z_width]
+        mins = [min_x, min_y, min_z]
+        total_width = sum(widths) + 2 * gap
+
+        if total_width > usable_w:
+            while total_width > usable_w and any(cur > mn for cur, mn in zip(widths, mins)):
+                idx = max(range(3), key=lambda i: widths[i])
+                if widths[idx] <= mins[idx]:
+                    break
+                widths[idx] -= 1
+                total_width -= 1
+
+        if total_width > usable_w:
+            idx_iter = 0
+            while total_width > usable_w and any(value > 1 for value in widths):
+                if widths[idx_iter] > 1:
+                    widths[idx_iter] -= 1
+                    total_width -= 1
+                idx_iter = (idx_iter + 1) % 3
+
+        if total_width > usable_w and usable_w > 0:
+            overflow = total_width - usable_w
+            for idx in range(3):
+                if overflow <= 0:
+                    break
+                reducible = widths[idx] - 1
+                if reducible <= 0:
+                    continue
+                delta = min(reducible, overflow)
+                widths[idx] -= delta
+                overflow -= delta
+                total_width -= delta
+
+        x_width, y_width, z_width = [max(1, width) for width in widths]
+        total_width = x_width + y_width + z_width + 2 * gap
+        if total_width > usable_w:
+            total_width = usable_w
+
+        x_start = x
+        y_start = x_start + x_width + gap
+        z_start = y_start + y_width + gap
+        tail_width = max(0, usable_w - (z_start - x + z_width))
+
+        def write(row: int, col: int, width: int, text: str, attr: int = 0) -> None:
+            if width <= 0:
+                return
+            try:
+                stdscr.addnstr(row, col, text[:width].ljust(width), width, attr)
+            except curses.error:
+                pass
+
+        header_y = y + 1
+        write(header_y, x_start, x_width, "x", curses.A_BOLD)
+        write(header_y, x_start + x_width, gap, " " * gap, curses.A_BOLD)
+        write(header_y, y_start, y_width, "y", curses.A_BOLD)
+        write(header_y, y_start + y_width, gap, " " * gap, curses.A_BOLD)
+        write(header_y, z_start, z_width, "z", curses.A_BOLD)
+
+        data_top = header_y + 1
+        data_height = body_h - 1
+        if data_height <= 0:
+            return
+
+        rows = []
+        for event in events:
+            identity = _event_identity(event)
+            if expand_all:
+                expanded = identity not in row_overrides
+            else:
+                expanded = identity in row_overrides
+            y_lines_full = _wrap_text(event.coords.y, y_width)
+            z_lines_full = _wrap_text(event.coords.z, z_width)
+            y_lines = y_lines_full if expanded else y_lines_full[:1]
+            z_lines = z_lines_full if expanded else z_lines_full[:1]
+            y_lines = y_lines or [""]
+            z_lines = z_lines or [""]
+            row_height = max(len(y_lines), len(z_lines))
+            rows.append(
+                {
+                    "identity": identity,
+                    "x": event.coords.x.strftime("%H:%M"),
+                    "y_lines": y_lines,
+                    "z_lines": z_lines,
+                    "height": max(1, row_height),
+                }
             )
-            stdscr.addnstr(y + 1 + idx, x, line, usable_w, attr)
+
+        total_rows = len(rows)
+        selected_event_idx = clamp(selected_event_idx, 0, total_rows - 1)
+        row_heights = [row["height"] for row in rows]
+
+        def compute_visible(start: int) -> List[int]:
+            start = max(0, start)
+            used = 0
+            visible: List[int] = []
+            idx = start
+            while idx < total_rows:
+                height = row_heights[idx]
+                if used + height > data_height:
+                    if not visible:
+                        visible.append(idx)
+                    break
+                visible.append(idx)
+                used += height
+                if used >= data_height:
+                    break
+                idx += 1
+            return visible
+
+        start_idx = 0
+        visible_indices = compute_visible(start_idx)
+        while selected_event_idx not in visible_indices and start_idx < total_rows - 1:
+            start_idx += 1
+            visible_indices = compute_visible(start_idx)
+
+        y_cursor = data_top
+        for idx in visible_indices:
+            row = rows[idx]
+            row_lines = row["height"]
+            y_lines = row["y_lines"]
+            z_lines = row["z_lines"]
+            attr_x = (
+                curses.A_REVERSE if (focus == "events" and idx == selected_event_idx) else 0
+            )
+            attr_y = attr_x
+            attr_z = attr_x
+            for line_offset in range(row_lines):
+                if y_cursor >= data_top + data_height:
+                    break
+                x_text = row["x"] if line_offset == 0 else ""
+                write(y_cursor, x_start, x_width, x_text, attr_x)
+                write(y_cursor, x_start + x_width, gap, " " * gap, attr_x)
+                y_text = y_lines[line_offset] if line_offset < len(y_lines) else ""
+                write(y_cursor, y_start, y_width, y_text, attr_y)
+                write(y_cursor, y_start + y_width, gap, " " * gap, attr_y)
+                z_text = z_lines[line_offset] if line_offset < len(z_lines) else ""
+                write(y_cursor, z_start, z_width, z_text, attr_z)
+                if tail_width > 0:
+                    write(y_cursor, z_start + z_width, tail_width, "", attr_z)
+                y_cursor += 1
+            if y_cursor >= data_top + data_height:
+                break
 
     def move_day(self, selected_date: date, delta_days: int) -> date:
         return selected_date + timedelta(days=delta_days)

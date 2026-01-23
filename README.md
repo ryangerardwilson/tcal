@@ -132,8 +132,10 @@ Successful commands print the stored JSON payload. Validation/storage failures r
 | `Ctrl+h` / `Ctrl+l` | month view | Previous / next month |
 | `Ctrl+j` / `Ctrl+k` | month view | Next / previous year |
 | `h/j/k/l`      | agenda + month | Move selection | 
-| `Tab`          | agenda / month | Agenda: cycle bucket filter · Month: toggle focus |
+| `Tab`          | agenda / month | Cycle bucket filter |
+| `Enter`        | month view | Toggle focus between calendar grid and day’s task list |
 | `B`            | agenda | Edit bucket for selected task via `$EDITOR` |
+| `,xr`          | agenda | Toggle expanded/collapsed state for current row |
 | `Esc`          | overlays / leader | Dismiss help / cancel leader / exit month-task focus |
 
 Leader sequences time out after 1 second.

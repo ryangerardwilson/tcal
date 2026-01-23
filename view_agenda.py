@@ -57,6 +57,15 @@ def _wrap_text(value: str, width: int) -> List[str]:
     return lines or [""]
 
 
+def _event_identity(event: Event) -> tuple[str, datetime, str, str]:
+    return (
+        event.bucket,
+        event.coords.x,
+        event.coords.y,
+        event.coords.z,
+    )
+
+
 class AgendaView:
     COLUMN_COUNT = 3
 
@@ -71,6 +80,7 @@ class AgendaView:
         *,
         expand_all: bool = True,
         selected_col: int = 0,
+        row_overrides: set[tuple] | None = None,
     ) -> int:  # type: ignore[name-defined]
         h, w = stdscr.getmaxyx()
         usable_h = h - 1
@@ -80,8 +90,8 @@ class AgendaView:
             return 0 if not self.events else clamp(scroll, 0, max(0, len(self.events) - 1))
 
         selected_col = clamp(selected_col, 0, self.COLUMN_COUNT - 1)
+        row_overrides = row_overrides or set()
 
-        bucket_labels = [ev.bucket for ev in self.events]
         timestamps = [ev.coords.x.strftime(_TIMESTAMP_FMT) for ev in self.events]
         y_values = [ev.coords.y for ev in self.events]
         z_values = [ev.coords.z for ev in self.events]
@@ -170,18 +180,23 @@ class AgendaView:
             return 0
 
         rows = []
-        for idx, bucket_text in enumerate(bucket_labels):
+        for idx, event in enumerate(self.events):
             timestamp = timestamps[idx]
             y_full = _wrap_text(y_values[idx], y_width)
             z_full = _wrap_text(z_values[idx], z_width)
-            y_lines = y_full if expand_all else y_full[:1]
-            z_lines = z_full if expand_all else z_full[:1]
+            identity = _event_identity(event)
+            if expand_all:
+                is_expanded = identity not in row_overrides
+            else:
+                is_expanded = identity in row_overrides
+            y_lines = y_full if is_expanded else y_full[:1]
+            z_lines = z_full if is_expanded else z_full[:1]
             y_lines = y_lines or [""]
             z_lines = z_lines or [""]
             height = max(len(y_lines), len(z_lines))
             rows.append(
                 {
-                    "bucket": bucket_text,
+                    "identity": identity,
                     "x": timestamp,
                     "y_lines": y_lines,
                     "z_lines": z_lines,

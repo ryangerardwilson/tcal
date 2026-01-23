@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Literal, Optional, List
+from datetime import date, datetime
+from typing import Literal, Optional, List, Set, Tuple
 
 from models import Event, ALL_BUCKET
 
@@ -38,6 +38,7 @@ class AppState:
     agenda_expand_all: bool = True
     agenda_col: int = 0
     agenda_bucket_filter: str = ALL_BUCKET
+    agenda_row_overrides: Set[Tuple[str, datetime, str, str]] = field(default_factory=set)
 
     # Month view
     month_focus: FocusName = "grid"

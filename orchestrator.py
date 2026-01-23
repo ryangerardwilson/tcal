@@ -100,6 +100,7 @@ class Orchestrator:
 
         print(json.dumps(event_to_jsonable(event), indent=2))
         self.state.events = updated
+        self._prune_row_overrides()
         return 0
 
     def _run_curses(self) -> int:
@@ -127,6 +128,7 @@ class Orchestrator:
             self.state.events = self.calendar.load_events()
             self.state.overlay = "none"
             self.state.overlay_message = ""
+            self._prune_row_overrides()
         except StorageError as exc:
             self.state.overlay = "error"
             self.state.overlay_message = f"Storage error: {exc}"
@@ -171,14 +173,22 @@ class Orchestrator:
                 self.state.agenda_scroll,
                 expand_all=self.state.agenda_expand_all,
                 selected_col=self.state.agenda_col,
+                row_overrides=self.state.agenda_row_overrides,
             )
         else:
-            view = MonthView(self.state.events)
+            filtered_events = self._bucket_filtered_events()
+            view = MonthView(filtered_events)
+            self.state.month_event_index = view.clamp_event_index(
+                self.state.month_selected_date, self.state.month_event_index
+            )
             view.render(
                 stdscr,
                 self.state.month_selected_date,
                 self.state.month_focus,
                 self.state.month_event_index,
+                expand_all=self.state.agenda_expand_all,
+                row_overrides=self.state.agenda_row_overrides,
+                bucket_label=self.state.agenda_bucket_filter,
             )
 
         if self.state.overlay != "none":
@@ -198,10 +208,12 @@ class Orchestrator:
                 "dd           delete selected event",
                 "hjkl         navigate (agenda/month)",
                 "B            agenda: edit bucket of selected task",
+                ",xr          agenda: toggle expand/collapse current row",
                 "Ctrl+h/l     month view: prev/next month",
                 "Ctrl+j/k     month view: next/prev year",
                 "a            toggle agenda/month",
-                "Tab          agenda: cycle buckets / month: toggle focus",
+                "Tab          cycle buckets (agenda & month)",
+                "Enter        month view: move focus grid ↔ tasks",
                 "Esc          dismiss overlays",
             ]
             draw_centered_box(stdscr, lines)
@@ -234,7 +246,7 @@ class Orchestrator:
             self.state.leader.started_at_ms = int(time.time() * 1000)
             return True
 
-        if self.state.view == "agenda" and ch == KEY_TAB:
+        if ch == KEY_TAB:
             self._cycle_agenda_bucket()
             return True
 
@@ -351,9 +363,7 @@ class Orchestrator:
 
         if sequence == "xar":
             self.state.agenda_expand_all = True
-            self.state.agenda_scroll = max(
-                0, min(self.state.agenda_scroll, max(len(self.state.events) - 1, 0))
-            )
+            self.state.agenda_row_overrides.clear()
             leader.active = False
             leader.sequence = ""
             leader.started_at_ms = None
@@ -361,9 +371,22 @@ class Orchestrator:
 
         if sequence == "xc":
             self.state.agenda_expand_all = False
-            self.state.agenda_scroll = max(
-                0, min(self.state.agenda_scroll, max(len(self.state.events) - 1, 0))
-            )
+            self.state.agenda_row_overrides.clear()
+            leader.active = False
+            leader.sequence = ""
+            leader.started_at_ms = None
+            return True
+
+        if sequence == "xr":
+            visible = self._visible_agenda_events()
+            if visible:
+                idx = max(0, min(self.state.agenda_index, len(visible) - 1))
+                identity = self._event_identity(visible[idx])
+                overrides = self.state.agenda_row_overrides
+                if identity in overrides:
+                    overrides.remove(identity)
+                else:
+                    overrides.add(identity)
             leader.active = False
             leader.sequence = ""
             leader.started_at_ms = None
@@ -425,6 +448,7 @@ class Orchestrator:
             self.state.month_event_index = min(
                 self.state.month_event_index, max(len(month_events) - 1, 0)
             )
+        self._prune_row_overrides()
         return True
 
     # Agenda behaviors
@@ -478,7 +502,8 @@ class Orchestrator:
 
     # Month behaviors
     def _handle_month_keys(self, ch: int) -> bool:
-        view = MonthView(self.state.events)
+        filtered_events = self._bucket_filtered_events()
+        view = MonthView(filtered_events)
         if self.state.month_focus == "grid":
             if ch == KEY_CTRL_H:
                 self.state.month_selected_date = view.move_month(
@@ -528,7 +553,7 @@ class Orchestrator:
                 )
                 self.state.month_event_index = 0
                 return True
-            if ch == KEY_TAB:
+            if ch in (ord("\n"), curses.KEY_ENTER):
                 if self._month_events_for_selected_date():
                     self.state.month_focus = "events"
                     self.state.month_event_index = view.clamp_event_index(
@@ -541,8 +566,9 @@ class Orchestrator:
                 self.state.month_focus = "grid"
                 self.state.month_event_index = 0
                 return self._handle_month_keys(ch)
-            if ch == KEY_TAB:
-                return False
+            if ch in (ord("\n"), curses.KEY_ENTER):
+                self.state.month_focus = "grid"
+                return True
             if ch == KEY_CTRL_H:
                 self.state.month_selected_date = view.move_month(
                     self.state.month_selected_date, -1
@@ -675,6 +701,8 @@ class Orchestrator:
                     ev,
                     replace_dt=(original is not None, original),
                 )
+                if original is not None:
+                    self._replace_row_override(original, ev)
             self.state.events = new_events
             self._pending_delete["active"] = False
             # Rebuild any derived selection indices sensibly
@@ -683,6 +711,7 @@ class Orchestrator:
                     self._reselect_agenda_event(updated_events[0])
             else:
                 self.state.month_event_index = 0
+            self._prune_row_overrides()
         except ValidationError as exc:
             self._show_overlay(stdscr, str(exc), kind="error")
         except StorageError as exc:
@@ -770,8 +799,10 @@ class Orchestrator:
             self._show_overlay(stdscr, str(exc), kind="error")
             return True
 
+        self._replace_row_override(event, updated_event)
         self.state.events = new_events
         self._reselect_agenda_event(updated_event)
+        self._prune_row_overrides()
         return True
 
     def _edit_agenda_bucket(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
@@ -833,8 +864,10 @@ class Orchestrator:
             self._show_overlay(stdscr, str(exc), kind="error")
             return True
 
+        self._replace_row_override(event, updated_event)
         self.state.events = new_events
         self._reselect_agenda_event(updated_event)
+        self._prune_row_overrides()
         return True
 
     def _launch_single_value_editor(
@@ -869,6 +902,9 @@ class Orchestrator:
                 pass
 
     def _visible_agenda_events(self) -> List[Event]:
+        return self._bucket_filtered_events()
+
+    def _bucket_filtered_events(self) -> List[Event]:
         if self.state.agenda_bucket_filter == ALL_BUCKET:
             return list(self.state.events)
         return [
@@ -900,6 +936,7 @@ class Orchestrator:
         self.state.agenda_bucket_filter = new_filter
         self.state.agenda_index = 0
         self.state.agenda_scroll = 0
+        self.state.month_event_index = 0
         self._ensure_agenda_index_bounds(len(self._visible_agenda_events()))
 
     @staticmethod
@@ -921,6 +958,21 @@ class Orchestrator:
         else:
             self.state.agenda_index = 0 if visible else 0
         self._ensure_agenda_index_bounds(len(visible))
+
+    def _prune_row_overrides(self) -> None:
+        valid = {self._event_identity(ev) for ev in self.state.events}
+        self.state.agenda_row_overrides.intersection_update(valid)
+
+    def _replace_row_override(
+        self, old_event: Event | None, new_event: Event
+    ) -> None:
+        if old_event is None:
+            return
+        old_identity = self._event_identity(old_event)
+        overrides = self.state.agenda_row_overrides
+        if old_identity in overrides:
+            overrides.remove(old_identity)
+            overrides.add(self._event_identity(new_event))
 
     def _seed_events_for_agenda(self, *, force_new: bool = False) -> List[Event]:
         visible = self._visible_agenda_events()
@@ -976,7 +1028,9 @@ class Orchestrator:
 
     def _month_events_for_selected_date(self) -> List[Event]:
         sel_day = self.state.month_selected_date
-        return [e for e in self.state.events if e.coords.x.date() == sel_day]
+        return [
+            e for e in self._bucket_filtered_events() if e.coords.x.date() == sel_day
+        ]
 
     def _show_overlay(
         self, stdscr: "curses.window", message: str, kind: str = "error"
