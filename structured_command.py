@@ -1,6 +1,4 @@
-
 """Parsing and formatting helpers for deterministic bucket/x/y/z commands."""
-
 
 import re
 from dataclasses import dataclass
@@ -13,7 +11,6 @@ from models import (
     BUCKETS,
     BucketName,
     Coordinates,
-    DEFAULT_BUCKET,
 )
 
 
@@ -68,7 +65,9 @@ def parse_structured_command(text: str) -> Event:
         raise StructuredCommandError("bucket(...) cannot be empty")
     if bucket not in BUCKETS:
         valid = ", ".join(BUCKETS)
-        raise StructuredCommandError(f"Invalid bucket '{bucket}'. Expected one of: {valid}")
+        raise StructuredCommandError(
+            f"Invalid bucket '{bucket}'. Expected one of: {valid}"
+        )
 
     try:
         dt = parse_datetime(x_raw)

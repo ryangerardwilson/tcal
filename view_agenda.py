@@ -87,7 +87,9 @@ class AgendaView:
         usable_w = max(0, w - 1)
 
         if usable_h <= 0 or usable_w <= 0:
-            return 0 if not self.events else clamp(scroll, 0, max(0, len(self.events) - 1))
+            return (
+                0 if not self.events else clamp(scroll, 0, max(0, len(self.events) - 1))
+            )
 
         selected_col = clamp(selected_col, 0, self.COLUMN_COUNT - 1)
         row_overrides = row_overrides or set()
@@ -109,7 +111,9 @@ class AgendaView:
         total_width = sum(widths) + (self.COLUMN_COUNT - 1) * _GAP_WIDTH
 
         if total_width > usable_w:
-            while total_width > usable_w and any(cur > minimum for cur, minimum in zip(widths, minimums)):
+            while total_width > usable_w and any(
+                cur > minimum for cur, minimum in zip(widths, minimums)
+            ):
                 largest_idx = max(range(self.COLUMN_COUNT), key=lambda idx: widths[idx])
                 if widths[largest_idx] <= minimums[largest_idx]:
                     break
@@ -173,7 +177,9 @@ class AgendaView:
         data_top = 1
         data_height = usable_h - 1
         if data_height <= 0:
-            return 0 if not self.events else clamp(scroll, 0, max(0, len(self.events) - 1))
+            return (
+                0 if not self.events else clamp(scroll, 0, max(0, len(self.events) - 1))
+            )
 
         if not self.events:
             write(data_top, 0, usable_w, _NO_TASKS_MESSAGE[:usable_w])
@@ -265,9 +271,15 @@ class AgendaView:
             row_lines = max(1, row["height"])
             y_lines = row["y_lines"]
             z_lines = row["z_lines"]
-            attr_x = curses.A_REVERSE if (idx == selected_idx and selected_col == 0) else 0
-            attr_y = curses.A_REVERSE if (idx == selected_idx and selected_col == 1) else 0
-            attr_z = curses.A_REVERSE if (idx == selected_idx and selected_col == 2) else 0
+            attr_x = (
+                curses.A_REVERSE if (idx == selected_idx and selected_col == 0) else 0
+            )
+            attr_y = (
+                curses.A_REVERSE if (idx == selected_idx and selected_col == 1) else 0
+            )
+            attr_z = (
+                curses.A_REVERSE if (idx == selected_idx and selected_col == 2) else 0
+            )
 
             for line_offset in range(row_lines):
                 if y_cursor >= data_bottom:

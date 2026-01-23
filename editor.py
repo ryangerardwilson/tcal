@@ -13,7 +13,6 @@ from typing import List, Tuple
 from models import Event, ValidationError, event_to_jsonable, normalize_event_payload
 
 
-
 class EditorError(Exception):
     pass
 

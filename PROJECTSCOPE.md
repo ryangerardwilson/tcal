@@ -2,23 +2,37 @@
 
 ## 1. Overview
 
-`xyz` is a **Vim-first, terminal-native task tracker** written in Python with `curses`. It focuses on keyboard workflows for inspecting schedules, runs entirely in the terminal, and supports deterministic CLI commands built around x/y/z tasks. Tasks are defined by three required fields that mirror an outcome-oriented Jobs-to-Be-Done (JTBD) statement: trigger `x` (context), outcome `y`, and impact `z` (why it matters).
+`xyz` is a **Vim-first, terminal-native task tracker** written in Python with
+`curses`. It focuses on keyboard workflows for inspecting schedules, runs
+entirely in the terminal, and supports deterministic CLI commands built around
+x/y/z tasks. Tasks are defined by three required fields that mirror an outcome-
+oriented Jobs-to-Be-Done (JTBD) statement: trigger `x` (context), outcome `y`,
+and impact `z` (why it matters).
 
 ### JTBD philosophy & non-linear intent
 
-The product deliberately reframes every task from *"what should the system do?"* to *"When X happens, I want Y outcome so I can Z."* This wording forces everyone—product, ops, comms, engineering—to prioritize user progress over implementation details:
+The product deliberately reframes every task from *"what should the system
+do?"* to *"When X happens, I want Y outcome so I can Z."* This wording forces
+everyone—product, ops, comms, engineering—to prioritize user progress over
+implementation details:
 
 - **X (trigger/context)** keeps each job rooted in a real situation without presuming a tool.
 - **Y (desired progress/outcome)** captures the functional or emotional advancement the user seeks, independent of any feature.
 - **Z (why it matters/value/impact)** surfaces the deeper motivation (efficiency, status, risk reduction), which is essential for differentiation.
 
-By avoiding verbs that describe *how* the system behaves ("send", "track", "notify"), xyz stays decoupled from specific solutions long enough to discover non-obvious, non-linear leaps. This makes the tracker function more like a "non-linear to-do list": instead of enumerating tasks in order, it anchors planning on outcomes and value. The payoff:
+By avoiding verbs that describe *how* the system behaves ("send", "track",
+"notify"), xyz stays decoupled from specific solutions long enough to discover
+non-obvious, non-linear leaps. This makes the tracker function more like a
+"non-linear to-do list": instead of enumerating tasks in order, it anchors
+planning on outcomes and value. The payoff:
 
 - **Better innovation** – teams can explore multiple ways to satisfy Y and Z instead of iterating on the current UI surface.
 - **Cross-functional alignment** – strategy, messaging, and operations share the same outcome vocabulary.
 - **High-leverage prioritization** – Z highlights where minimal effort can generate outsized gains, supporting non-linear goals like exponential adoption or dramatic ROI jumps.
 
-When users capture tasks in xyz, they're effectively articulating JTBD statements that expose both the immediate trigger and the downstream reason it matters, which keeps the entire workflow oriented around meaningful progress.
+When users capture tasks in xyz, they're effectively articulating JTBD
+statements that expose both the immediate trigger and the downstream reason it
+matters, which keeps the entire workflow oriented around meaningful progress.
 
 ---
 
@@ -46,7 +60,8 @@ When users capture tasks in xyz, they're effectively articulating JTBD statement
 - Multi-user collaboration or sharing.
 - Anything that requires background jobs or OAuth (until priorities change).
 
-Natural-language assistants are currently out-of-scope; the CLI focuses on deterministic x/y/z commands.
+Natural-language assistants are currently out-of-scope; the CLI focuses on
+deterministic x/y/z commands.
 
 ---
 
@@ -63,7 +78,8 @@ Natural-language assistants are currently out-of-scope; the CLI focuses on deter
 - Manage `CalendarService`, `MonthView`, `AgendaView`, and the leader/overlay state machine.
 - Handle `dd` deletion flow and month navigation.
 
-`main.py` must remain slim; orchestration/logging/routing lives in `orchestrator.py`.
+`main.py` must remain slim; orchestration/logging/routing lives in
+`orchestrator.py`.
 
 ---
 
@@ -129,20 +145,16 @@ Natural-language assistants are currently out-of-scope; the CLI focuses on deter
 
 ## 8. Keybinding Reference (current)
 
-| Key / Sequence | Scope | Action |
-| -------------- | ----- | ------ |
-| `q` / `Q`      | global | Quit |
-| `?`            | global | Toggle help |
-| `t`            | global | Jump to today |
-| `a`            | global | Toggle Month / Agenda views |
-| `i`            | view (item) | Edit/create via `$EDITOR` |
-| `n`            | agenda + month events | Create a new event |
-| `dd`           | agenda + month events | Delete selected event |
-| `Ctrl+h` / `Ctrl+l` | month view | Previous / next month |
-| `Ctrl+j` / `Ctrl+k` | month view | Next / previous year |
-| `h/j/k/l`      | agenda + month | Move selection |
-| `Tab`          | month view | Toggle grid vs events focus |
-| `Esc`          | overlays / leader | Dismiss overlays, cancel leader, exit month events focus |
+| Key / Sequence | Scope | Action | | -------------- | ----- | ------ | | `q` /
+`Q`      | global | Quit | | `?`            | global | Toggle help | | `t`
+| global | Jump to today | | `a`            | global | Toggle Month / Agenda
+views | | `i`            | view (item) | Edit/create via `$EDITOR` | | `n`
+| agenda + month events | Create a new event | | `dd`           | agenda +
+month events | Delete selected event | | `Ctrl+h` / `Ctrl+l` | month view |
+Previous / next month | | `Ctrl+j` / `Ctrl+k` | month view | Next / previous
+year | | `h/j/k/l`      | agenda + month | Move selection | | `Tab`          |
+month view | Toggle grid vs events focus | | `Esc`          | overlays / leader
+| Dismiss overlays, cancel leader, exit month events focus |
 
 Leader sequences may expand (week/day views) post-v0.
 
@@ -176,4 +188,5 @@ Leader sequences may expand (week/day views) post-v0.
 - Notifications/reminders.
 - Multi-user shared calendars.
 
-Scope creep rule: any feature needing background jobs, OAuth, or remote services stays out until explicitly prioritized.
+Scope creep rule: any feature needing background jobs, OAuth, or remote
+services stays out until explicitly prioritized.

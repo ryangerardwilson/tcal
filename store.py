@@ -71,7 +71,9 @@ def _write_atomic(path: Path, rows: Iterable[List[str]]) -> None:
 
 
 def save_events(path: Path, events: Iterable[Event]) -> None:
-    ordered = sorted(events, key=lambda e: (e.coords.x, e.bucket, e.coords.y, e.coords.z))
+    ordered = sorted(
+        events, key=lambda e: (e.coords.x, e.bucket, e.coords.y, e.coords.z)
+    )
     rows = [_serialize_event(e) for e in ordered]
     _write_atomic(path, rows)
 
@@ -101,7 +103,9 @@ def upsert_event(
     else:
         updated = list(events)
     updated.append(new_event)
-    ordered = sorted(updated, key=lambda e: (e.coords.x, e.bucket, e.coords.y, e.coords.z))
+    ordered = sorted(
+        updated, key=lambda e: (e.coords.x, e.bucket, e.coords.y, e.coords.z)
+    )
     save_events(path, ordered)
     return ordered
 

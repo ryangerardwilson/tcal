@@ -89,16 +89,16 @@ class MonthView:
             return
 
         title = f"{calendar.month_name[selected_date.month]}, {selected_date.year}"
-        stdscr.addnstr(
-            0, 0, title[: max(0, body_w - 1)], max(0, body_w - 1), 0
-        )
+        stdscr.addnstr(0, 0, title[: max(0, body_w - 1)], max(0, body_w - 1), 0)
 
         content_top = 2  # blank line between title and grid
         available_h = body_h - content_top
         if available_h <= 0:
             return
 
-        grid_needed_rows = self._grid_required_rows(selected_date) + 1  # include header row
+        grid_needed_rows = (
+            self._grid_required_rows(selected_date) + 1
+        )  # include header row
         min_events_rows = 3 if available_h >= 3 else available_h
 
         grid_rows = min(grid_needed_rows, max(available_h - min_events_rows, 0))
@@ -123,7 +123,9 @@ class MonthView:
                 selected_date,
             )
         if events_rows > 0:
-            events_start = content_top + grid_rows + 1  # blank line between grid and events
+            events_start = (
+                content_top + grid_rows + 1
+            )  # blank line between grid and events
             self._draw_events_pane(
                 stdscr,
                 events_start,
@@ -232,7 +234,9 @@ class MonthView:
         stdscr.addnstr(
             y,
             x,
-            f"Tasks {selected_date.isoformat()}{title_suffix}"[:usable_w].ljust(usable_w),
+            f"Tasks {selected_date.isoformat()}{title_suffix}"[:usable_w].ljust(
+                usable_w
+            ),
             usable_w,
             curses.A_BOLD,
         )
@@ -242,7 +246,13 @@ class MonthView:
             return
         events = evs
         if not events:
-            stdscr.addnstr(y + 1, x, "(no tasks)"[:usable_w].ljust(usable_w), usable_w, curses.A_DIM)
+            stdscr.addnstr(
+                y + 1,
+                x,
+                "(no tasks)"[:usable_w].ljust(usable_w),
+                usable_w,
+                curses.A_DIM,
+            )
             return
 
         timestamps = [ev.coords.x.strftime("%H:%M") for ev in events]
@@ -267,7 +277,9 @@ class MonthView:
         total_width = sum(widths) + 2 * gap
 
         if total_width > usable_w:
-            while total_width > usable_w and any(cur > mn for cur, mn in zip(widths, mins)):
+            while total_width > usable_w and any(
+                cur > mn for cur, mn in zip(widths, mins)
+            ):
                 idx = max(range(3), key=lambda i: widths[i])
                 if widths[idx] <= mins[idx]:
                     break
@@ -384,7 +396,9 @@ class MonthView:
             y_lines = row["y_lines"]
             z_lines = row["z_lines"]
             attr_x = (
-                curses.A_REVERSE if (focus == "events" and idx == selected_event_idx) else 0
+                curses.A_REVERSE
+                if (focus == "events" and idx == selected_event_idx)
+                else 0
             )
             attr_y = attr_x
             attr_z = attr_x

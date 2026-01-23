@@ -38,7 +38,9 @@ class AppState:
     agenda_expand_all: bool = True
     agenda_col: int = 0
     agenda_bucket_filter: str = ALL_BUCKET
-    agenda_row_overrides: Set[Tuple[str, datetime, str, str]] = field(default_factory=set)
+    agenda_row_overrides: Set[Tuple[str, datetime, str, str]] = field(
+        default_factory=set
+    )
 
     # Month view
     month_focus: FocusName = "grid"

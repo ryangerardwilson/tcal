@@ -65,7 +65,9 @@ def _run_upgrade() -> int:
             return 0
     try:
         curl = subprocess.Popen(
-            ["curl", "-fsSL", INSTALL_URL], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            ["curl", "-fsSL", INSTALL_URL],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
     except FileNotFoundError:
         print("Upgrade requires curl", file=sys.stderr)
@@ -85,7 +87,9 @@ def _run_upgrade() -> int:
     curl_rc = curl.wait()
 
     if curl_rc != 0:
-        stderr = curl.stderr.read().decode("utf-8", errors="replace") if curl.stderr else ""
+        stderr = (
+            curl.stderr.read().decode("utf-8", errors="replace") if curl.stderr else ""
+        )
         if stderr:
             sys.stderr.write(stderr)
         return curl_rc
@@ -101,7 +105,7 @@ def _print_help() -> None:
         "  xyz -h           Show this help\n"
         "  xyz -v           Show installed version\n"
         "  xyz -u           Reinstall latest release if newer exists\n"
-        "  xyz -x \"<YYYY-MM-DD HH:MM[:SS]>\" -y \"<outcome>\" -z \"<impact>\" [-b <bucket>]\n"
+        '  xyz -x "<YYYY-MM-DD HH:MM[:SS]>" -y "<outcome>" -z "<impact>" [-b <bucket>]\n'
     )
 
 
@@ -187,7 +191,9 @@ def main(argv: list[str] | None = None) -> int:
     if "x" in flag_values or "y" in flag_values or "z" in flag_values:
         missing = [flag for flag in ("x", "y", "z") if flag_values.get(flag) is None]
         if missing:
-            print(f"Missing required flag(s): {', '.join(f'-{flag}' for flag in missing)}")
+            print(
+                f"Missing required flag(s): {', '.join(f'-{flag}' for flag in missing)}"
+            )
             return 1
         x_val = flag_values.get("x") or ""
         y_val = flag_values.get("y") or ""

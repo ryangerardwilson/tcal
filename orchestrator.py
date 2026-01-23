@@ -641,8 +641,7 @@ class Orchestrator:
             allow_overwrite = not force_new and bool(visible)
             originals_source = (
                 [visible[self.state.agenda_index]]
-                if allow_overwrite
-                and 0 <= self.state.agenda_index < len(visible)
+                if allow_overwrite and 0 <= self.state.agenda_index < len(visible)
                 else []
             )
             single_event_payload = len(seeds) == 1
@@ -814,7 +813,9 @@ class Orchestrator:
         curses.def_prog_mode()
         curses.endwin()
         try:
-            ok, payload = self._launch_single_value_editor(os.environ.get("EDITOR", "vim"), event.bucket)
+            ok, payload = self._launch_single_value_editor(
+                os.environ.get("EDITOR", "vim"), event.bucket
+            )
         finally:
             curses.reset_prog_mode()
             stdscr.refresh()
@@ -870,7 +871,9 @@ class Orchestrator:
         self, editor_cmd: str, seed_value: str
     ) -> tuple[bool, str | None]:
         cmd = shlex.split(editor_cmd) if editor_cmd and editor_cmd.strip() else ["vim"]
-        with tempfile.NamedTemporaryFile("w+", suffix=".txt", delete=False, encoding="utf-8") as tmp:
+        with tempfile.NamedTemporaryFile(
+            "w+", suffix=".txt", delete=False, encoding="utf-8"
+        ) as tmp:
             tmp_path = Path(tmp.name)
             tmp.write(seed_value)
             tmp.flush()
@@ -904,7 +907,9 @@ class Orchestrator:
         if self.state.agenda_bucket_filter == ALL_BUCKET:
             return list(self.state.events)
         return [
-            ev for ev in self.state.events if ev.bucket == self.state.agenda_bucket_filter
+            ev
+            for ev in self.state.events
+            if ev.bucket == self.state.agenda_bucket_filter
         ]
 
     def _ensure_agenda_index_bounds(self, visible_length: int) -> None:
@@ -959,9 +964,7 @@ class Orchestrator:
         valid = {self._event_identity(ev) for ev in self.state.events}
         self.state.agenda_row_overrides.intersection_update(valid)
 
-    def _replace_row_override(
-        self, old_event: Event | None, new_event: Event
-    ) -> None:
+    def _replace_row_override(self, old_event: Event | None, new_event: Event) -> None:
         if old_event is None:
             return
         old_identity = self._event_identity(old_event)
@@ -972,11 +975,7 @@ class Orchestrator:
 
     def _seed_events_for_agenda(self, *, force_new: bool = False) -> List[Event]:
         visible = self._visible_agenda_events()
-        if (
-            not force_new
-            and visible
-            and 0 <= self.state.agenda_index < len(visible)
-        ):
+        if not force_new and visible and 0 <= self.state.agenda_index < len(visible):
             return [visible[self.state.agenda_index]]
         today = date.today()
         dt_str = f"{today.strftime('%Y-%m-%d')} {SEEDED_DEFAULT_TIME}"
