@@ -197,6 +197,7 @@ class Orchestrator:
                 "i            edit/create event",
                 "dd           delete selected event",
                 "hjkl         navigate (agenda/month)",
+                "B            agenda: edit bucket of selected task",
                 "Ctrl+h/l     month view: prev/next month",
                 "Ctrl+j/k     month view: next/prev year",
                 "a            toggle agenda/month",
@@ -282,6 +283,9 @@ class Orchestrator:
                 return self._edit_or_create(stdscr, force_new=False)
             else:
                 return False
+
+        if self.state.view == "agenda" and ch == ord("B"):
+            return self._edit_agenda_bucket(stdscr)
 
         # View-specific navigation
         if self.state.view == "agenda":
@@ -697,10 +701,8 @@ class Orchestrator:
         editor_cmd = os.environ.get("EDITOR", "vim")
 
         if column == 0:
-            seed_value = event.bucket
-        elif column == 1:
             seed_value = event.coords.x.strftime(DATETIME_FMT)
-        elif column == 2:
+        elif column == 1:
             seed_value = event.coords.y
         else:
             seed_value = event.coords.z
@@ -729,19 +731,6 @@ class Orchestrator:
 
         updated_event = event
         if column == 0:
-            new_bucket = payload.strip().lower()
-            if not new_bucket:
-                self._show_overlay(stdscr, "Bucket cannot be empty", kind="error")
-                return True
-            if new_bucket not in BUCKETS:
-                valid = ", ".join(BUCKETS)
-                self._show_overlay(stdscr, f"Invalid bucket '{new_bucket}'. Expected one of: {valid}", kind="error")
-                return True
-            bucket_name = cast(BucketName, new_bucket)
-            if bucket_name == event.bucket:
-                return True
-            updated_event = event.with_updated(bucket=bucket_name)
-        elif column == 1:
             new_value = payload.strip()
             if not new_value:
                 self._show_overlay(stdscr, "Datetime cannot be empty", kind="error")
@@ -754,7 +743,7 @@ class Orchestrator:
             if new_dt == event.coords.x:
                 return True
             updated_event = event.with_updated(x=new_dt)
-        elif column == 2:
+        elif column == 1:
             new_value = payload.strip()
             if not new_value:
                 self._show_overlay(stdscr, "'y' (outcome) cannot be empty", kind="error")
@@ -770,6 +759,69 @@ class Orchestrator:
             if new_value == event.coords.z:
                 return True
             updated_event = event.with_updated(z=new_value)
+
+        try:
+            new_events = self.calendar.upsert_event(
+                self.state.events,
+                updated_event,
+                replace_dt=(True, event),
+            )
+        except (ValidationError, StorageError) as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        self.state.events = new_events
+        self._reselect_agenda_event(updated_event)
+        return True
+
+    def _edit_agenda_bucket(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        visible = self._visible_agenda_events()
+        if not visible:
+            return False
+
+        idx = max(0, min(self.state.agenda_index, len(visible) - 1))
+        event = visible[idx]
+
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            ok, payload = self._launch_single_value_editor(os.environ.get("EDITOR", "vim"), event.bucket)
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if not ok:
+            if payload:
+                self._show_overlay(stdscr, payload, kind="error")
+            return True
+
+        if payload is None:
+            return True
+
+        new_bucket = payload.strip().lower()
+        if not new_bucket:
+            self._show_overlay(stdscr, "Bucket cannot be empty", kind="error")
+            return True
+        if new_bucket not in BUCKETS:
+            valid = ", ".join(BUCKETS)
+            self._show_overlay(
+                stdscr,
+                f"Invalid bucket '{new_bucket}'. Expected one of: {valid}",
+                kind="error",
+            )
+            return True
+
+        bucket_name = cast(BucketName, new_bucket)
+        if bucket_name == event.bucket:
+            return True
+
+        updated_event = event.with_updated(bucket=bucket_name)
 
         try:
             new_events = self.calendar.upsert_event(

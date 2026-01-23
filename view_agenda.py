@@ -12,8 +12,6 @@ from models import Event
 from ui_base import clamp
 
 _TIMESTAMP_FMT = "%Y-%m-%d %H:%M"
-_MIN_BUCKET_WIDTH = 8
-_MAX_BUCKET_WIDTH = 22
 _MIN_X_WIDTH = 6
 _MAX_X_WIDTH = 19
 _MIN_Y_WIDTH = 6
@@ -60,7 +58,7 @@ def _wrap_text(value: str, width: int) -> List[str]:
 
 
 class AgendaView:
-    COLUMN_COUNT = 4
+    COLUMN_COUNT = 3
 
     def __init__(self, events: List[Event]):
         self.events = events
@@ -88,18 +86,16 @@ class AgendaView:
         y_values = [ev.coords.y for ev in self.events]
         z_values = [ev.coords.z for ev in self.events]
 
-        max_bucket_len = max((len(label) for label in bucket_labels), default=len("bucket"))
         max_x_len = max((len(val) for val in timestamps), default=len("x"))
         max_y_len = max((_max_line_length(val) for val in y_values), default=len("y"))
         max_z_len = max((_max_line_length(val) for val in z_values), default=len("z"))
 
-        bucket_width = max(_MIN_BUCKET_WIDTH, min(_MAX_BUCKET_WIDTH, max(len("bucket"), max_bucket_len)))
         x_width = max(_MIN_X_WIDTH, min(_MAX_X_WIDTH, max(len("x"), max_x_len)))
         y_width = max(_MIN_Y_WIDTH, min(_MAX_Y_WIDTH, max(len("y"), max_y_len)))
         z_width = max(_MIN_Z_WIDTH, min(_MAX_Z_WIDTH, max(len("z"), max_z_len)))
 
-        widths = [bucket_width, x_width, y_width, z_width]
-        minimums = [_MIN_BUCKET_WIDTH, _MIN_X_WIDTH, _MIN_Y_WIDTH, _MIN_Z_WIDTH]
+        widths = [x_width, y_width, z_width]
+        minimums = [_MIN_X_WIDTH, _MIN_Y_WIDTH, _MIN_Z_WIDTH]
         total_width = sum(widths) + (self.COLUMN_COUNT - 1) * _GAP_WIDTH
 
         if total_width > usable_w:
@@ -131,14 +127,13 @@ class AgendaView:
                 overflow -= delta
                 total_width -= delta
 
-        bucket_width, x_width, y_width, z_width = [max(1, width) for width in widths]
-        total_width = bucket_width + x_width + y_width + z_width + (self.COLUMN_COUNT - 1) * _GAP_WIDTH
+        x_width, y_width, z_width = [max(1, width) for width in widths]
+        total_width = x_width + y_width + z_width + (self.COLUMN_COUNT - 1) * _GAP_WIDTH
 
         if total_width > usable_w and usable_w > 0:
             return clamp(scroll, 0, max(0, len(self.events) - 1))
 
-        bucket_start = 0
-        x_start = bucket_start + bucket_width + _GAP_WIDTH
+        x_start = 0
         y_start = x_start + x_width + _GAP_WIDTH
         z_start = y_start + y_width + _GAP_WIDTH
         tail_width = max(0, usable_w - (z_start + z_width))
@@ -157,8 +152,6 @@ class AgendaView:
                 pass
 
         header_y = 0
-        write(header_y, bucket_start, bucket_width, "bucket", curses.A_BOLD)
-        write(header_y, bucket_start + bucket_width, _GAP_WIDTH, " " * _GAP_WIDTH, curses.A_BOLD)
         write(header_y, x_start, x_width, "x", curses.A_BOLD)
         write(header_y, x_start + x_width, _GAP_WIDTH, " " * _GAP_WIDTH, curses.A_BOLD)
         write(header_y, y_start, y_width, "y", curses.A_BOLD)
@@ -257,24 +250,13 @@ class AgendaView:
             row_lines = max(1, row["height"])
             y_lines = row["y_lines"]
             z_lines = row["z_lines"]
-            attr_bucket = curses.A_REVERSE if (idx == selected_idx and selected_col == 0) else 0
-            attr_x = curses.A_REVERSE if (idx == selected_idx and selected_col == 1) else 0
-            attr_y = curses.A_REVERSE if (idx == selected_idx and selected_col == 2) else 0
-            attr_z = curses.A_REVERSE if (idx == selected_idx and selected_col == 3) else 0
+            attr_x = curses.A_REVERSE if (idx == selected_idx and selected_col == 0) else 0
+            attr_y = curses.A_REVERSE if (idx == selected_idx and selected_col == 1) else 0
+            attr_z = curses.A_REVERSE if (idx == selected_idx and selected_col == 2) else 0
 
             for line_offset in range(row_lines):
                 if y_cursor >= data_bottom:
                     break
-
-                bucket_text = row["bucket"] if line_offset == 0 else ""
-                write(y_cursor, bucket_start, bucket_width, bucket_text, attr_bucket)
-                write(
-                    y_cursor,
-                    bucket_start + bucket_width,
-                    _GAP_WIDTH,
-                    " " * _GAP_WIDTH,
-                    attr_bucket,
-                )
 
                 x_text = row["x"] if line_offset == 0 else ""
                 write(y_cursor, x_start, x_width, x_text, attr_x)

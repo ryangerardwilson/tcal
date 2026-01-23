@@ -126,13 +126,14 @@ Successful commands print the stored JSON payload. Validation/storage failures r
 | `?`            | global | Toggle help overlay |
 | `t`            | global | Jump to today |
 | `a`            | global | Toggle between Month / Agenda views |
-| `i`            | view (item) | Edit/create via `$EDITOR` (x/y/z) |
+| `i`            | agenda + month | Edit/create via `$EDITOR` (x/y/z) |
 | `n`            | agenda + month tasks | Create a new event |
 | `dd`           | agenda + month tasks | Delete selected task |
 | `Ctrl+h` / `Ctrl+l` | month view | Previous / next month |
 | `Ctrl+j` / `Ctrl+k` | month view | Next / previous year |
 | `h/j/k/l`      | agenda + month | Move selection | 
-| `Tab`          | month view | Toggle focus between calendar grid and day’s task list |
+| `Tab`          | agenda / month | Agenda: cycle bucket filter · Month: toggle focus |
+| `B`            | agenda | Edit bucket for selected task via `$EDITOR` |
 | `Esc`          | overlays / leader | Dismiss help / cancel leader / exit month-task focus |
 
 Leader sequences time out after 1 second.
