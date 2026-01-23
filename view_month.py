@@ -416,7 +416,7 @@ class MonthView:
                 z_text = z_lines[line_offset] if line_offset < len(z_lines) else ""
                 write(y_cursor, z_start, z_width, z_text, attr_z)
                 if tail_width > 0:
-                    write(y_cursor, z_start + z_width, tail_width, "", attr_z)
+                    write(y_cursor, z_start + z_width, tail_width, "", 0)
                 y_cursor += 1
             if y_cursor >= data_top + data_height:
                 break
