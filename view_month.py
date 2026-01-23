@@ -233,12 +233,11 @@ class MonthView:
     ) -> None:
         evs = self.events_by_date.get(selected_date, [])
         selected_col = clamp(selected_col, 0, 2)
-        title_suffix = f" — bucket: {bucket_label}" if bucket_label else ""
         usable_w = max(0, w - 1)
         stdscr.addnstr(
             y,
             x,
-            f"Tasks {selected_date.isoformat()}{title_suffix}"[:usable_w].ljust(
+            f"Tasks {selected_date.isoformat()}"[:usable_w].ljust(
                 usable_w
             ),
             usable_w,

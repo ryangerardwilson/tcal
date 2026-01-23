@@ -156,8 +156,7 @@ class Orchestrator:
         stdscr.erase()
 
         footer = "? help — x=trigger y=outcome z=impact (CLI requires all)"
-        if self.state.view == "agenda":
-            footer = f"{footer}  |  bucket: {self.state.agenda_bucket_filter}"
+        footer = f"{footer}  |  bucket: {self.state.agenda_bucket_filter}"
         if self.state.leader.active:
             leader_seq = f",{self.state.leader.sequence}"
             footer = f"{footer}  |  {leader_seq}"
