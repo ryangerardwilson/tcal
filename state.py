@@ -46,6 +46,7 @@ class AppState:
     month_focus: FocusName = "grid"
     month_selected_date: date = field(default_factory=lambda: date.today())
     month_event_index: int = 0
+    month_event_col: int = 0
 
 
 __all__ = ["AppState", "LeaderState", "ViewName", "FocusName", "OverlayKind"]

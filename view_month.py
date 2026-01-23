@@ -76,6 +76,7 @@ class MonthView:
         selected_date: date,
         focus: str,
         selected_event_idx: int,
+        selected_col: int,
         *,
         expand_all: bool,
         row_overrides: Set[Tuple[str, datetime, str, str]],
@@ -135,6 +136,7 @@ class MonthView:
                 selected_date,
                 focus,
                 selected_event_idx,
+                selected_col,
                 expand_all,
                 row_overrides,
                 bucket_label,
@@ -224,11 +226,13 @@ class MonthView:
         selected_date: date,
         focus: str,
         selected_event_idx: int,
+        selected_col: int,
         expand_all: bool,
         row_overrides: Set[Tuple[str, datetime, str, str]],
         bucket_label: str,
     ) -> None:
         evs = self.events_by_date.get(selected_date, [])
+        selected_col = clamp(selected_col, 0, 2)
         title_suffix = f" — bucket: {bucket_label}" if bucket_label else ""
         usable_w = max(0, w - 1)
         stdscr.addnstr(
@@ -363,6 +367,7 @@ class MonthView:
 
         total_rows = len(rows)
         selected_event_idx = clamp(selected_event_idx, 0, total_rows - 1)
+        selected_col = clamp(selected_col, 0, 2)
         row_heights = [row["height"] for row in rows]
 
         def compute_visible(start: int) -> List[int]:
@@ -395,13 +400,10 @@ class MonthView:
             row_lines = row["height"]
             y_lines = row["y_lines"]
             z_lines = row["z_lines"]
-            attr_x = (
-                curses.A_REVERSE
-                if (focus == "events" and idx == selected_event_idx)
-                else 0
-            )
-            attr_y = attr_x
-            attr_z = attr_x
+            is_active_row = focus == "events" and idx == selected_event_idx
+            attr_x = curses.A_REVERSE if is_active_row and selected_col == 0 else 0
+            attr_y = curses.A_REVERSE if is_active_row and selected_col == 1 else 0
+            attr_z = curses.A_REVERSE if is_active_row and selected_col == 2 else 0
             for line_offset in range(row_lines):
                 if y_cursor >= data_top + data_height:
                     break

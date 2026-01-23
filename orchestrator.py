@@ -181,11 +181,13 @@ class Orchestrator:
             self.state.month_event_index = view.clamp_event_index(
                 self.state.month_selected_date, self.state.month_event_index
             )
+            self.state.month_event_col = max(0, min(self.state.month_event_col, 2))
             view.render(
                 stdscr,
                 self.state.month_selected_date,
                 self.state.month_focus,
                 self.state.month_event_index,
+                self.state.month_event_col,
                 expand_all=self.state.agenda_expand_all,
                 row_overrides=self.state.agenda_row_overrides,
                 bucket_label=self.state.agenda_bucket_filter,
@@ -511,6 +513,9 @@ class Orchestrator:
                     self.state.month_event_index = view.clamp_event_index(
                         self.state.month_selected_date, self.state.month_event_index
                     )
+                    self.state.month_event_col = max(
+                        0, min(self.state.month_event_col, 2)
+                    )
                     return True
                 return False
             if ch == KEY_CTRL_H:
@@ -565,7 +570,13 @@ class Orchestrator:
             if ch in (ord("\n"), curses.KEY_ENTER):
                 self.state.month_focus = "grid"
                 return True
-            if ch in (KEY_H, KEY_L, KEY_CTRL_H, KEY_CTRL_L, KEY_CTRL_J, KEY_CTRL_K):
+            if ch == KEY_H:
+                self.state.month_event_col = max(0, self.state.month_event_col - 1)
+                return True
+            if ch == KEY_L:
+                self.state.month_event_col = min(2, self.state.month_event_col + 1)
+                return True
+            if ch in (KEY_CTRL_H, KEY_CTRL_L, KEY_CTRL_J, KEY_CTRL_K):
                 self.state.month_focus = "grid"
                 self.state.month_event_index = 0
                 return self._handle_month_keys(ch)
@@ -938,6 +949,7 @@ class Orchestrator:
         self.state.agenda_index = 0
         self.state.agenda_scroll = 0
         self.state.month_event_index = 0
+        self.state.month_event_col = 0
         self._ensure_agenda_index_bounds(len(self._visible_agenda_events()))
 
     @staticmethod
