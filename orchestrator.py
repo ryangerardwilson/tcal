@@ -15,7 +15,7 @@ from datetime import date
 from typing import List, cast
 
 from calendar_service import CalendarService, StorageError
-from config import load_config
+from config import load_config, config_file_path
 from editor import edit_event_via_editor
 from keys import (
     KEY_A,
@@ -242,7 +242,7 @@ class Orchestrator:
 
         # Leader handling
         if self.state.leader.active:
-            leader_handled = self._handle_leader_input(ch)
+            leader_handled = self._handle_leader_input(stdscr, ch)
             if leader_handled is not None:
                 return leader_handled
 
@@ -337,7 +337,9 @@ class Orchestrator:
             if now_ms - self._pending_delete["started_at"] > DELETE_TIMEOUT_MS:
                 self._pending_delete["active"] = False
 
-    def _handle_leader_input(self, ch: int) -> bool | None:
+    def _handle_leader_input(
+        self, stdscr: "curses.window", ch: int
+    ) -> bool | None:  # type: ignore[name-defined]
         leader = self.state.leader
 
         if ch == KEY_ESC:
@@ -356,6 +358,14 @@ class Orchestrator:
         sequence = leader.sequence + char
         leader.sequence = sequence
         leader.started_at_ms = int(time.time() * 1000)
+
+        if "conf".startswith(sequence):
+            if sequence == "conf":
+                leader.active = False
+                leader.sequence = ""
+                leader.started_at_ms = None
+                return self._edit_config(stdscr)
+            return False
 
         if self.state.view != "agenda":
             leader.active = False
@@ -649,6 +659,88 @@ class Orchestrator:
             return True
 
     # Editing / creating
+    def _edit_config(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        path = config_file_path()
+        if not path.exists():
+            initial = {"data_csv_path": str(self.config.data_csv_path)}
+            try:
+                path.write_text(json.dumps(initial, indent=2) + "\n", encoding="utf-8")
+            except Exception as exc:  # noqa: BLE001
+                self._show_overlay(
+                    stdscr, f"Failed to initialize config file: {exc}", kind="error"
+                )
+                return True
+
+        editor_cmd = os.environ.get("EDITOR", "vim")
+        try:
+            cmd = shlex.split(editor_cmd) if editor_cmd.strip() else ["vim"]
+        except ValueError:
+            cmd = ["vim"]
+
+        curses.def_prog_mode()
+        curses.endwin()
+
+        error_message: str | None = None
+        cancelled = False
+
+        try:
+            try:
+                proc = subprocess.run(cmd + [str(path)], check=False)
+            except FileNotFoundError:
+                error_message = f"Editor not found: {cmd[0]}"
+            except Exception as exc:  # noqa: BLE001
+                error_message = f"Editor failed: {exc}"
+            else:
+                if proc.returncode != 0:
+                    cancelled = True
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if error_message:
+            self._show_overlay(stdscr, error_message, kind="error")
+            return True
+
+        if cancelled:
+            self._show_overlay(stdscr, "Config edit cancelled", kind="message")
+            return True
+
+        return self._reload_config_from_disk(stdscr)
+
+    def _reload_config_from_disk(
+        self, stdscr: "curses.window"
+    ) -> bool:  # type: ignore[name-defined]
+        new_config = load_config()
+        new_calendar = CalendarService(new_config.data_csv_path)
+        try:
+            events = new_calendar.load_events()
+        except StorageError as exc:
+            self._show_overlay(stdscr, f"Storage error: {exc}", kind="error")
+            return True
+
+        self.config = new_config
+        self.calendar = new_calendar
+        self.state.events = events
+        self._prune_row_overrides()
+        self._ensure_agenda_index_bounds(len(self._visible_agenda_events()))
+        month_events = self._month_events_for_selected_date()
+        if month_events:
+            self.state.month_event_index = max(
+                0, min(self.state.month_event_index, len(month_events) - 1)
+            )
+        else:
+            self.state.month_event_index = 0
+            if self.state.month_focus == "events":
+                self.state.month_focus = "grid"
+        self._show_overlay(stdscr, "Config reloaded", kind="message")
+        return True
+
     def _edit_or_create(
         self, stdscr: "curses.window", *, force_new: bool = False
     ) -> bool:  # type: ignore[name-defined]

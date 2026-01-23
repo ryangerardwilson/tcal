@@ -31,6 +31,14 @@ def _default_data_path() -> Path:
     return data_dir / DEFAULT_DATA_FILENAME
 
 
+def config_file_path() -> Path:
+    """Return the fully-resolved path to the config file."""
+
+    path = (Path(xdg_config_home()) / "xyz" / CONFIG_FILENAME).expanduser()
+    ensure_dir(path.parent)
+    return path
+
+
 def load_config() -> Config:
     """Load config from XDG path, falling back to defaults.
 
@@ -38,7 +46,7 @@ def load_config() -> Config:
     error message available to callers if needed.
     """
 
-    config_path = (Path(xdg_config_home()) / "xyz" / CONFIG_FILENAME).expanduser()
+    config_path = config_file_path()
     raw: Dict[str, Any] = {}
 
     if config_path.exists():
@@ -64,4 +72,4 @@ def _strip_trailing_commas(text: str) -> str:
     return re.sub(r",(\s*[}\]])", r"\1", text)
 
 
-__all__ = ["Config", "load_config", "CONFIG_FILENAME"]
+__all__ = ["Config", "load_config", "CONFIG_FILENAME", "config_file_path"]

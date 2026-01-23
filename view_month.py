@@ -304,20 +304,36 @@ class MonthView:
         z_start = y_start + y_width + gap
         tail_width = max(0, usable_w - (z_start - x + z_width))
 
-        def write(row: int, col: int, width: int, text: str, attr: int = 0) -> None:
+        def write(
+            row: int,
+            col: int,
+            width: int,
+            text: str,
+            attr: int = 0,
+            align: str = "left",
+        ) -> None:
             if width <= 0:
                 return
             try:
-                stdscr.addnstr(row, col, text[:width].ljust(width), width, attr)
+                raw = text or ""
+                if len(raw) > width:
+                    raw = raw[-width:] if align == "right" else raw[:width]
+                if align == "right":
+                    padded = raw.rjust(width)
+                elif align == "center":
+                    padded = raw.center(width)
+                else:
+                    padded = raw.ljust(width)
+                stdscr.addnstr(row, col, padded, width, attr)
             except curses.error:
                 pass
 
         header_y = y
-        write(header_y, x_start, x_width, "x", curses.A_BOLD)
+        write(header_y, x_start, x_width, "x", curses.A_BOLD, align="right")
         write(header_y, x_start + x_width, gap, " " * gap, curses.A_BOLD)
-        write(header_y, y_start, y_width, "y", curses.A_BOLD)
+        write(header_y, y_start, y_width, "y", curses.A_BOLD, align="right")
         write(header_y, y_start + y_width, gap, " " * gap, curses.A_BOLD)
-        write(header_y, z_start, z_width, "z", curses.A_BOLD)
+        write(header_y, z_start, z_width, "z", curses.A_BOLD, align="right")
 
         data_top = header_y + 1
         data_height = body_h - 1
@@ -391,13 +407,13 @@ class MonthView:
                 if y_cursor >= data_top + data_height:
                     break
                 x_text = row["x"] if line_offset == 0 else ""
-                write(y_cursor, x_start, x_width, x_text, attr_x)
+                write(y_cursor, x_start, x_width, x_text, attr_x, align="right")
                 write(y_cursor, x_start + x_width, gap, " " * gap, attr_x)
                 y_text = y_lines[line_offset] if line_offset < len(y_lines) else ""
-                write(y_cursor, y_start, y_width, y_text, attr_y)
+                write(y_cursor, y_start, y_width, y_text, attr_y, align="right")
                 write(y_cursor, y_start + y_width, gap, " " * gap, attr_y)
                 z_text = z_lines[line_offset] if line_offset < len(z_lines) else ""
-                write(y_cursor, z_start, z_width, z_text, attr_z)
+                write(y_cursor, z_start, z_width, z_text, attr_z, align="right")
                 if tail_width > 0:
                     write(y_cursor, z_start + z_width, tail_width, "", 0)
                 y_cursor += 1
