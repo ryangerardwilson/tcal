@@ -157,6 +157,11 @@ class Orchestrator:
 
         footer = "? help — x=trigger y=outcome z=impact"
         footer = f"{footer}  |  bucket: {self.state.agenda_bucket_filter}"
+        if self.state.view == "month":
+            focus_label = (
+                "FOCUS:LIST" if self.state.month_focus == "events" else "FOCUS:MONTH"
+            )
+            footer = f"{footer}  |  {focus_label}"
         if self.state.leader.active:
             leader_seq = f",{self.state.leader.sequence}"
             footer = f"{footer}  |  {leader_seq}"
