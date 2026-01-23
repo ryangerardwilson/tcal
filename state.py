@@ -36,6 +36,7 @@ class AppState:
     agenda_index: int = 0
     agenda_scroll: int = 0
     agenda_expand_all: bool = True
+    agenda_col: int = 0
 
     # Month view
     month_focus: FocusName = "grid"

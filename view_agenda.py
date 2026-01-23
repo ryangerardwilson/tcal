@@ -61,6 +61,8 @@ class AgendaView:
     def __init__(self, events: List[Event]):
         self.events = events
 
+    COLUMN_COUNT = 3
+
     def render(
         self,
         stdscr: "curses.window",
@@ -68,6 +70,7 @@ class AgendaView:
         scroll: int,
         *,
         expand_all: bool = True,
+        selected_col: int = 0,
     ) -> int:  # type: ignore[name-defined]
         h, w = stdscr.getmaxyx()
         usable_h = h - 1
@@ -75,6 +78,8 @@ class AgendaView:
 
         if usable_h <= 0 or usable_w <= 0:
             return 0 if not self.events else clamp(scroll, 0, max(0, len(self.events) - 1))
+
+        selected_col = clamp(selected_col, 0, self.COLUMN_COUNT - 1)
 
         timestamps = [ev.x.strftime(_TIMESTAMP_FMT) for ev in self.events]
         y_values = ["" if ev.y is None else str(ev.y) for ev in self.events]
@@ -242,25 +247,31 @@ class AgendaView:
             row_lines = max(1, row["height"])
             y_lines = row["y_lines"]
             z_lines = row["z_lines"]
+            attr_x_base = curses.A_REVERSE if (idx == selected_idx and selected_col == 0) else 0
+            attr_y_base = curses.A_REVERSE if (idx == selected_idx and selected_col == 1) else 0
+            attr_z_base = curses.A_REVERSE if (idx == selected_idx and selected_col == 2) else 0
             for line_offset in range(row_lines):
                 if y_cursor >= data_bottom:
                     break
-                attr = curses.A_REVERSE if idx == selected_idx else 0
                 x_text = row["x"] if line_offset == 0 else ""
-                write(y_cursor, x_start, x_width, x_text, attr)
-                write(y_cursor, x_start + x_width, _GAP_WIDTH, " " * _GAP_WIDTH, attr)
+                write(y_cursor, x_start, x_width, x_text, attr_x_base)
+                write(y_cursor, x_start + x_width, _GAP_WIDTH, " " * _GAP_WIDTH, attr_x_base)
                 y_text = y_lines[line_offset] if line_offset < len(y_lines) else ""
-                write(y_cursor, y_start, y_width, y_text, attr)
-                write(y_cursor, y_start + y_width, _GAP_WIDTH, " " * _GAP_WIDTH, attr)
+                write(y_cursor, y_start, y_width, y_text, attr_y_base)
+                write(y_cursor, y_start + y_width, _GAP_WIDTH, " " * _GAP_WIDTH, attr_y_base)
                 z_text = z_lines[line_offset] if line_offset < len(z_lines) else ""
-                write(y_cursor, z_start, z_width, z_text, attr)
+                write(y_cursor, z_start, z_width, z_text, attr_z_base)
                 if tail_width > 0:
-                    write(y_cursor, z_start + z_width, tail_width, "", attr)
+                    trailing_attr = attr_z_base if selected_col == 2 and idx == selected_idx else 0
+                    write(y_cursor, z_start + z_width, tail_width, "", trailing_attr)
                 y_cursor += 1
             if y_cursor >= data_bottom:
                 break
 
         return scroll
+
+    def clamp_column(self, col: int) -> int:
+        return clamp(col, 0, self.COLUMN_COUNT - 1)
 
     def move_selection(self, selected_idx: int, delta: int) -> int:
         if not self.events:

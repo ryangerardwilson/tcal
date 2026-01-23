@@ -6,7 +6,11 @@ from __future__ import annotations
 import curses
 import json
 import os
+import shlex
+import subprocess
+import tempfile
 import time
+from pathlib import Path
 from datetime import date
 from typing import List, cast
 
@@ -34,7 +38,7 @@ from keys import (
     KEY_TAB,
     KEY_TODAY,
 )
-from models import Event, ValidationError, normalize_event_payload
+from models import DATETIME_FMT, Event, ValidationError, normalize_event_payload, parse_datetime
 from state import AppState
 from ui_base import draw_centered_box, draw_footer
 from view_agenda import AgendaView
@@ -150,6 +154,7 @@ class Orchestrator:
                 self.state.agenda_index,
                 self.state.agenda_scroll,
                 expand_all=self.state.agenda_expand_all,
+                selected_col=self.state.agenda_col,
             )
         else:
             view = MonthView(self.state.events)
@@ -235,6 +240,8 @@ class Orchestrator:
                 handled = True
             self.state.overlay = "none"
             self.state.leader.active = False
+            self.state.leader.sequence = ""
+            self.state.leader.started_at_ms = None
             self._pending_delete["active"] = False
             return True if handled or self.state.overlay == "none" else False
 
@@ -243,8 +250,9 @@ class Orchestrator:
 
         if ch == KEY_I:
             if self.state.view == "agenda":
-                force_new = not self.state.events
-                return self._edit_or_create(stdscr, force_new=force_new)
+                if not self.state.events:
+                    return self._edit_or_create(stdscr, force_new=True)
+                return self._edit_agenda_cell(stdscr)
             elif (
                 self.state.view == "month"
                 and self.state.month_focus == "events"
@@ -409,8 +417,14 @@ class Orchestrator:
             self.state.agenda_index = view.move_selection(self.state.agenda_index, -1)
             return True
         if ch == KEY_H:
-            return self._agenda_jump_day(-1)
+            self.state.agenda_col = view.clamp_column(self.state.agenda_col - 1)
+            return True
         if ch == KEY_L:
+            self.state.agenda_col = view.clamp_column(self.state.agenda_col + 1)
+            return True
+        if ch == ord("H"):
+            return self._agenda_jump_day(-1)
+        if ch == ord("L"):
             return self._agenda_jump_day(+1)
         return False
 
@@ -649,6 +663,127 @@ class Orchestrator:
             self._show_overlay(stdscr, f"Storage error: {exc}", kind="error")
         return True
 
+    def _edit_agenda_cell(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        if not self.state.events:
+            return False
+
+        event = self.state.events[self.state.agenda_index]
+        column = max(0, min(self.state.agenda_col, AgendaView.COLUMN_COUNT - 1))
+        self.state.agenda_col = column
+        editor_cmd = os.environ.get("EDITOR", "vim")
+
+        if column == 0:
+            seed_value = event.x.strftime(DATETIME_FMT)
+        elif column == 1:
+            seed_value = event.y
+        else:
+            seed_value = event.z
+
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            ok, payload = self._launch_single_value_editor(editor_cmd, seed_value)
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if not ok:
+            if payload:
+                self._show_overlay(stdscr, payload, kind="error")
+            return True
+
+        if payload is None:
+            return True
+
+        updated_event = event
+        if column == 0:
+            new_value = payload.strip()
+            if not new_value:
+                self._show_overlay(stdscr, "Datetime cannot be empty", kind="error")
+                return True
+            try:
+                new_dt = parse_datetime(new_value)
+            except ValidationError as exc:
+                self._show_overlay(stdscr, str(exc), kind="error")
+                return True
+            if new_dt == event.x:
+                return True
+            updated_event = event.with_updated(x=new_dt)
+        elif column == 1:
+            new_value = payload.strip()
+            if not new_value:
+                self._show_overlay(stdscr, "'y' (outcome) cannot be empty", kind="error")
+                return True
+            if new_value == event.y:
+                return True
+            updated_event = event.with_updated(y=new_value)
+        else:
+            new_value = payload.strip()
+            if not new_value:
+                self._show_overlay(stdscr, "'z' (impact) cannot be empty", kind="error")
+                return True
+            if new_value == event.z:
+                return True
+            updated_event = event.with_updated(z=new_value)
+
+        try:
+            new_events = self.calendar.upsert_event(
+                self.state.events,
+                updated_event,
+                replace_dt=(True, event),
+            )
+        except (ValidationError, StorageError) as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        self.state.events = new_events
+        for idx, ev in enumerate(new_events):
+            if ev.x == updated_event.x and ev.y == updated_event.y and ev.z == updated_event.z:
+                self.state.agenda_index = idx
+                break
+        self.state.agenda_scroll = max(
+            0,
+            min(self.state.agenda_scroll, max(len(new_events) - 1, 0)),
+        )
+        return True
+
+    def _launch_single_value_editor(
+        self, editor_cmd: str, seed_value: str
+    ) -> tuple[bool, str | None]:
+        cmd = shlex.split(editor_cmd) if editor_cmd and editor_cmd.strip() else ["vim"]
+        with tempfile.NamedTemporaryFile("w+", suffix=".txt", delete=False, encoding="utf-8") as tmp:
+            tmp_path = Path(tmp.name)
+            tmp.write(seed_value)
+            tmp.flush()
+        try:
+            try:
+                proc = subprocess.run(cmd + [str(tmp_path)], check=False)
+            except FileNotFoundError:
+                return False, f"Editor not found: {cmd[0]}"
+            except Exception as exc:  # noqa: BLE001
+                return False, f"Editor failed: {exc}"
+
+            if proc.returncode != 0:
+                return False, None
+
+            try:
+                contents = tmp_path.read_text(encoding="utf-8")
+            except Exception as exc:  # noqa: BLE001
+                return False, f"Failed to read edited value: {exc}"
+
+            return True, contents.rstrip("\n")
+        finally:
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
     def _seed_events_for_agenda(self, *, force_new: bool = False) -> List[Event]:
         if (
             not force_new
@@ -658,10 +793,6 @@ class Orchestrator:
             return [self.state.events[self.state.agenda_index]]
         today = date.today()
         dt_str = f"{today.strftime('%Y-%m-%d')} {SEEDED_DEFAULT_TIME}"
-        from models import parse_datetime
-
-        from models import Event as EventModel
-
         return [Event(x=parse_datetime(dt_str), y="", z="")]
 
     def _seed_events_for_month(
@@ -678,8 +809,6 @@ class Orchestrator:
                     return [evs[self.state.month_event_index]]
                 return evs
         dt_str = f"{sel_day.strftime('%Y-%m-%d')} {SEEDED_DEFAULT_TIME}"
-        from models import parse_datetime
-
         return [Event(x=parse_datetime(dt_str), y="", z="")]
 
     def _month_events_for_selected_date(self) -> List[Event]:
