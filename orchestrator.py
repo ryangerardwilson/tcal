@@ -289,17 +289,19 @@ class Orchestrator:
                 if not visible:
                     return self._edit_or_create(stdscr, force_new=True)
                 return self._edit_agenda_cell(stdscr)
-            elif (
-                self.state.view == "month"
-                and self.state.month_focus == "events"
-                and self._month_events_for_selected_date()
-            ):
-                return self._edit_or_create(stdscr, force_new=False)
+            elif self.state.view == "month" and self.state.month_focus == "events":
+                if not self._month_events_for_selected_date():
+                    return self._edit_or_create(stdscr, force_new=True)
+                return self._edit_month_cell(stdscr)
             else:
                 return False
 
-        if self.state.view == "agenda" and ch == ord("B"):
-            return self._edit_agenda_bucket(stdscr)
+        if ch == ord("B"):
+            if self.state.view == "agenda":
+                return self._edit_agenda_bucket(stdscr)
+            if self.state.view == "month" and self.state.month_focus == "events":
+                return self._edit_month_bucket(stdscr)
+            return False
 
         # View-specific navigation
         if self.state.view == "agenda":
@@ -878,6 +880,145 @@ class Orchestrator:
         self._prune_row_overrides()
         return True
 
+    def _edit_month_cell(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        events = self._month_events_for_selected_date()
+        if not events:
+            return False
+
+        idx = max(0, min(self.state.month_event_index, len(events) - 1))
+        event = events[idx]
+        column = max(0, min(self.state.month_event_col, 2))
+        self.state.month_event_col = column
+        editor_cmd = os.environ.get("EDITOR", "vim")
+
+        if column == 0:
+            seed_value = event.coords.x.strftime(DATETIME_FMT)
+        elif column == 1:
+            seed_value = event.coords.y
+        else:
+            seed_value = event.coords.z
+
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            ok, payload = self._launch_single_value_editor(editor_cmd, seed_value)
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if not ok or payload is None:
+            return True
+
+        updated_event = event
+        if column == 0:
+            new_value = payload.strip()
+            if not new_value:
+                return True
+            try:
+                new_dt = parse_datetime(new_value)
+            except ValidationError:
+                return True
+            if new_dt == event.coords.x:
+                return True
+            updated_event = event.with_updated(x=new_dt)
+        elif column == 1:
+            new_value = payload.strip()
+            if not new_value or new_value == event.coords.y:
+                return True
+            updated_event = event.with_updated(y=new_value)
+        else:
+            new_value = payload.strip()
+            if not new_value or new_value == event.coords.z:
+                return True
+            updated_event = event.with_updated(z=new_value)
+
+        try:
+            new_events = self.calendar.upsert_event(
+                self.state.events,
+                updated_event,
+                replace_dt=(True, event),
+            )
+        except ValidationError:
+            return True
+        except StorageError as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        self._replace_row_override(event, updated_event)
+        self.state.events = new_events
+        self._reselect_month_event(updated_event)
+        self._prune_row_overrides()
+        return True
+
+    def _edit_month_bucket(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        events = self._month_events_for_selected_date()
+        if not events:
+            return False
+
+        idx = max(0, min(self.state.month_event_index, len(events) - 1))
+        event = events[idx]
+
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            ok, payload = self._launch_single_value_editor(
+                os.environ.get("EDITOR", "vim"), event.bucket
+            )
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if not ok or payload is None:
+            return True
+
+        new_bucket = payload.strip().lower()
+        if not new_bucket:
+            return True
+        if new_bucket not in BUCKETS:
+            valid = ", ".join(BUCKETS)
+            self._show_overlay(
+                stdscr,
+                f"Invalid bucket '{new_bucket}'. Expected one of: {valid}",
+                kind="error",
+            )
+            return True
+
+        bucket_name = cast(BucketName, new_bucket)
+        if bucket_name == event.bucket:
+            return True
+
+        updated_event = event.with_updated(bucket=bucket_name)
+
+        try:
+            new_events = self.calendar.upsert_event(
+                self.state.events,
+                updated_event,
+                replace_dt=(True, event),
+            )
+        except ValidationError:
+            return True
+        except StorageError as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        self._replace_row_override(event, updated_event)
+        self.state.events = new_events
+        self._reselect_month_event(updated_event)
+        self._prune_row_overrides()
+        return True
+
     def _launch_single_value_editor(
         self, editor_cmd: str, seed_value: str
     ) -> tuple[bool, str | None]:
@@ -971,6 +1112,22 @@ class Orchestrator:
         else:
             self.state.agenda_index = 0 if visible else 0
         self._ensure_agenda_index_bounds(len(visible))
+
+    def _reselect_month_event(self, target: Event) -> None:
+        target_day = target.coords.x.date()
+        if target_day != self.state.month_selected_date:
+            self.state.month_selected_date = target_day
+        events = self._month_events_for_selected_date()
+        identity = self._event_identity(target)
+        for idx, ev in enumerate(events):
+            if self._event_identity(ev) == identity:
+                self.state.month_event_index = idx
+                break
+        else:
+            self.state.month_event_index = min(
+                self.state.month_event_index, max(len(events) - 1, 0)
+            )
+        self.state.month_event_col = max(0, min(self.state.month_event_col, 2))
 
     def _prune_row_overrides(self) -> None:
         valid = {self._event_identity(ev) for ev in self.state.events}
