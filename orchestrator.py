@@ -58,7 +58,7 @@ from view_month import MonthView
 
 LEADER_TIMEOUT_MS = 1000
 DELETE_TIMEOUT_MS = 600
-SEEDED_DEFAULT_TIME = "09:00:00"
+SEEDED_DEFAULT_TIME = "23:59:59"
 
 
 class Orchestrator:
