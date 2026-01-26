@@ -162,22 +162,36 @@ return exit code `1` with a descriptive error.
 
 ## Keyboard Shortcuts
 
-| Key / Sequence | Scope | Action | | -------------- | ----- | ------ | | `q` /
-`Q`      | global | Quit | | `?`            | global | Toggle help overlay | |
-`t`            | global | Jump to today | | `a`            | global | Toggle
-between Month / Agenda views | | `i`            | agenda + month | Edit/create
-via `$EDITOR` (x/y/z) | | `n`            | agenda + month tasks | Create a new
-event | | `dd`           | agenda + month tasks | Delete selected task | |
-`Ctrl+h` / `Ctrl+l` | month view | Previous / next month | | `Ctrl+j` /
-`Ctrl+k` | month view | Next / previous year | | `h/j/k/l`      | agenda +
-month | Move selection | | `Tab`          | agenda / month | Cycle bucket
-filter | | `Enter`        | month view | Toggle focus between calendar grid and
-day’s task list | | `B`            | agenda | Edit bucket for selected task via
-`$EDITOR` | | `,xr`          | agenda | Toggle expanded/collapsed state for
-current row | | `Esc`          | overlays / leader | Dismiss help / cancel
-leader / exit month-task focus |
+### Global
 
-Leader sequences time out after 1 second.
+- `q` / `Q` – Quit
+- `?` – Toggle help overlay
+- `t` – Jump to today
+- `a` – Toggle between month and agenda views
+
+### Agenda & Month (shared)
+
+- `i` – Edit/create via `$EDITOR` (x/y/z)
+- `n` – Create a new event
+- `h` / `j` / `k` / `l` – Move selection
+- `dd` – Delete selected task
+- `Tab` – Cycle bucket filter
+
+### Month view
+
+- `Enter` – Toggle focus between calendar grid and day’s task list
+- `Ctrl+h` / `Ctrl+l` – Previous / next month
+- `Ctrl+j` / `Ctrl+k` – Next / previous year
+
+### Agenda-only extras
+
+- `B` – Edit bucket for selected task via `$EDITOR`
+- `,xr` – Toggle expanded/collapsed state for current row
+
+### Overlays & leader
+
+- `Esc` – Dismiss help, cancel leader, or exit month-task focus
+- Leader sequences time out after 1 second
 
 ---
 
