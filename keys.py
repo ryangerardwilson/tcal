@@ -18,6 +18,7 @@ KEY_CTRL_H = 8
 KEY_CTRL_L = 12
 KEY_CTRL_J = 10
 KEY_CTRL_K = 11
+KEY_ENTER = 13
 KEY_A = ord("a")
 KEY_N = ord("n")
 
@@ -40,6 +41,7 @@ __all__ = [
     "KEY_CTRL_L",
     "KEY_CTRL_J",
     "KEY_CTRL_K",
+    "KEY_ENTER",
     "KEY_A",
     "KEY_N",
     "KEY_H",

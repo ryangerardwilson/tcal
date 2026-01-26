@@ -24,6 +24,7 @@ from keys import (
     KEY_CTRL_J,
     KEY_CTRL_K,
     KEY_CTRL_L,
+    KEY_ENTER,
     KEY_D,
     KEY_ESC,
     KEY_H,
@@ -117,9 +118,14 @@ class Orchestrator:
         curses.curs_set(0)
         stdscr.nodelay(True)
         stdscr.timeout(100)
+        stdscr.keypad(True)
         try:
             curses.start_color()
             curses.use_default_colors()
+        except curses.error:
+            pass
+        try:
+            curses.nonl()
         except curses.error:
             pass
 
@@ -523,7 +529,7 @@ class Orchestrator:
         filtered_events = self._bucket_filtered_events()
         view = MonthView(filtered_events)
         if self.state.month_focus == "grid":
-            if ch in (ord("\n"), curses.KEY_ENTER):
+            if ch in (KEY_ENTER, curses.KEY_ENTER):
                 if self._month_events_for_selected_date():
                     self.state.month_focus = "events"
                     self.state.month_event_index = view.clamp_event_index(
@@ -583,7 +589,7 @@ class Orchestrator:
                 self.state.month_event_index = 0
                 return True
         else:  # focus == events
-            if ch in (ord("\n"), curses.KEY_ENTER):
+            if ch in (KEY_ENTER, curses.KEY_ENTER):
                 self.state.month_focus = "grid"
                 return True
             if ch == KEY_H:
