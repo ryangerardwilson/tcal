@@ -211,6 +211,11 @@ class Orchestrator:
     def _render_overlay(self, stdscr: "curses.window") -> None:  # type: ignore[name-defined]
         if self.state.overlay == "help":
             lines = [
+                "Guidance",
+                "If x ≈ 3-month goals, y/z should feel realistic and grounded.",
+                "If x ≈ 5-year goals, y/z should feel expansive yet meaningful.",
+                "If x ≈ lifetime goals, y/z should feel deeply values-driven.",
+                "",
                 "xyz shortcuts",
                 "",
                 "q            quit",
