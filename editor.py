@@ -71,7 +71,7 @@ def edit_event_via_editor(
         except ValidationError:
             return False, ""  # silently ignore validation errors
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             return False, ""
     finally:
         try:

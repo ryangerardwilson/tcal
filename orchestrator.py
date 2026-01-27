@@ -53,7 +53,8 @@ from models import (
     ALL_BUCKET,
 )
 from state import AppState
-from ui_base import draw_centered_box, draw_footer
+from help_content import HELP_LINES
+from ui_base import clamp, draw_centered_box, draw_footer, draw_help_overlay
 from view_agenda import AgendaView
 from view_month import MonthView
 
@@ -161,6 +162,25 @@ class Orchestrator:
     def _draw(self, stdscr: "curses.window") -> None:  # type: ignore[name-defined]
         stdscr.erase()
 
+        if self.state.help_visible:
+            height, _ = stdscr.getmaxyx()
+            total = len(HELP_LINES)
+            max_visible = max(1, height - 1)
+            max_scroll = max(0, total - max_visible)
+            scroll = clamp(self.state.help_scroll, 0, max_scroll)
+            start = scroll + 1 if total else 0
+            end = min(total, scroll + max_visible) if total else 0
+            footer = (
+                f"HELP {start}-{end}/{total}  |  j/k scroll  |  Ctrl+J/K page  |  ? or Esc close"
+                if total
+                else "HELP — no entries"
+            )
+            self.state.help_scroll = draw_help_overlay(
+                stdscr, HELP_LINES, scroll=scroll, footer=footer
+            )
+            stdscr.refresh()
+            return
+
         footer = "? help — x=trigger y=outcome z=impact"
         footer = f"{footer}  |  bucket: {self.state.agenda_bucket_filter}"
         if self.state.view == "month":
@@ -209,46 +229,18 @@ class Orchestrator:
         stdscr.refresh()
 
     def _render_overlay(self, stdscr: "curses.window") -> None:  # type: ignore[name-defined]
-        if self.state.overlay == "help":
-            lines = [
-                "Guidance",
-                "",
-                "If x ≈ 3-month goals, y/z should feel realistic and grounded.",
-                "If x ≈ 5-year goals, y/z should feel expansive yet meaningful.",
-                "If x ≈ lifetime goals, y/z should feel deeply values-driven.",
-                "",
-                "Shortcuts",
-                "",
-                "q            quit",
-                "?            toggle this help",
-                "t            jump to today",
-                "i            edit/create event",
-                "dd           delete selected event",
-                "hjkl         navigate (agenda/month)",
-                "B            agenda: edit bucket of selected task",
-                ",xr          agenda: toggle expand/collapse current row",
-                "Ctrl+h/l     month view: prev/next month",
-                "Ctrl+j/k     month view: next/prev year",
-                "a            toggle agenda/month",
-                "Tab          cycle buckets (agenda & month)",
-                "Enter        month view: move focus grid ↔ tasks",
-                "Esc          dismiss overlays",
-            ]
-            draw_centered_box(stdscr, lines)
-        elif self.state.overlay in ("error", "message"):
+        if self.state.overlay in ("error", "message"):
             draw_centered_box(
                 stdscr, [self.state.overlay_message, "", "Press any key to dismiss"]
             )
 
     # Key handling
     def _handle_key(self, stdscr: "curses.window", ch: int) -> bool:
-        # Overlays dismiss on any key (except help which uses Esc as well)
-        if self.state.overlay == "help":
-            if ch == KEY_ESC:
-                self.state.overlay = "none"
-                return True
-            # Allow other keys to pass to main flow too
-        elif self.state.overlay in ("error", "message"):
+        if self.state.help_visible:
+            return self._handle_help_key(stdscr, ch)
+
+        # Overlays dismiss on any key
+        if self.state.overlay in ("error", "message"):
             self.state.overlay = "none"
             return True
 
@@ -280,7 +272,8 @@ class Orchestrator:
             return handled_delete
 
         if ch == KEY_HELP:
-            self.state.overlay = "help"
+            self.state.help_visible = True
+            self.state.help_scroll = 0
             return True
 
         if ch == KEY_ESC:
@@ -348,6 +341,50 @@ class Orchestrator:
         if self._pending_delete["active"]:
             if now_ms - self._pending_delete["started_at"] > DELETE_TIMEOUT_MS:
                 self._pending_delete["active"] = False
+
+    def _handle_help_key(self, stdscr: "curses.window", ch: int) -> bool:  # type: ignore[name-defined]
+        height, _ = stdscr.getmaxyx()
+        total = len(HELP_LINES)
+        max_visible = max(1, height - 1)
+        max_scroll = max(0, total - max_visible)
+        scroll = clamp(self.state.help_scroll, 0, max_scroll)
+
+        if ch in (KEY_HELP, KEY_ESC):
+            self.state.help_visible = False
+            self.state.help_scroll = 0
+            return True
+
+        needs_redraw = False
+        if ch in (KEY_J, curses.KEY_DOWN):
+            if scroll < max_scroll:
+                self.state.help_scroll = clamp(scroll + 1, 0, max_scroll)
+                needs_redraw = True
+        elif ch in (KEY_K, curses.KEY_UP):
+            if scroll > 0:
+                self.state.help_scroll = clamp(scroll - 1, 0, max_scroll)
+                needs_redraw = True
+        elif ch in (KEY_CTRL_J, curses.KEY_NPAGE):
+            jump = max(1, max_visible // 2)
+            new_scroll = clamp(scroll + jump, 0, max_scroll)
+            if new_scroll != scroll:
+                self.state.help_scroll = new_scroll
+                needs_redraw = True
+        elif ch in (KEY_CTRL_K, curses.KEY_PPAGE):
+            jump = max(1, max_visible // 2)
+            new_scroll = clamp(scroll - jump, 0, max_scroll)
+            if new_scroll != scroll:
+                self.state.help_scroll = new_scroll
+                needs_redraw = True
+        elif ch == curses.KEY_HOME:
+            if scroll != 0:
+                self.state.help_scroll = 0
+                needs_redraw = True
+        elif ch == curses.KEY_END:
+            if scroll != max_scroll:
+                self.state.help_scroll = max_scroll
+                needs_redraw = True
+
+        return needs_redraw
 
     def _handle_leader_input(
         self, stdscr: "curses.window", ch: int
@@ -886,7 +923,7 @@ class Orchestrator:
                 return True
             try:
                 new_dt = parse_datetime(new_value)
-            except ValidationError as exc:
+            except ValidationError:
                 return True
             if new_dt == event.coords.x:
                 return True

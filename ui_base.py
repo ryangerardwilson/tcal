@@ -62,8 +62,51 @@ def draw_centered_box(stdscr: "curses._CursesWindow", lines: Iterable[str]) -> N
     win.refresh()
 
 
+def draw_help_overlay(
+    stdscr: "curses.window",  # type: ignore[name-defined]
+    lines: Iterable[str],
+    *,
+    scroll: int = 0,
+    footer: str = "",
+) -> int:
+    """Render a full-screen overlay for the help/cheatsheet view.
+
+    Returns the clamped scroll offset used for rendering.
+    """
+
+    h, w = stdscr.getmaxyx()
+    if h <= 0 or w <= 0:
+        return 0
+
+    lines_list = list(lines)
+    total = len(lines_list)
+    max_visible = max(1, h - 1)
+    max_scroll = max(0, total - max_visible)
+    scroll = clamp(scroll, 0, max_scroll)
+
+    dim_attr = curses.A_DIM if hasattr(curses, "A_DIM") else 0
+
+    blank_line = " " * max(0, w - 1)
+    for y in range(h - 1):
+        stdscr.addnstr(y, 0, blank_line, max(0, w - 1), dim_attr)
+
+    visible = lines_list[scroll : scroll + max_visible]
+    for row, line in enumerate(visible):
+        stdscr.addnstr(row, 0, line.ljust(max(1, w - 1)), max(0, w - 1))
+
+    draw_footer(stdscr, footer)
+
+    return scroll
+
+
 def clamp(value: int, min_value: int, max_value: int) -> int:
     return max(min_value, min(value, max_value))
 
 
-__all__ = ["draw_header", "draw_footer", "draw_centered_box", "clamp"]
+__all__ = [
+    "draw_header",
+    "draw_footer",
+    "draw_centered_box",
+    "draw_help_overlay",
+    "clamp",
+]

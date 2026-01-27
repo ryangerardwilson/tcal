@@ -30,6 +30,9 @@ class AppState:
     overlay_message: str = ""
     focused_date: date = field(default_factory=lambda: date.today())
 
+    help_visible: bool = False
+    help_scroll: int = 0
+
     events: List[Event] = field(default_factory=list)
 
     # Agenda selection
