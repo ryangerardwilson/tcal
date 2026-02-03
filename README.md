@@ -106,7 +106,7 @@ compounding results instead of incremental busywork.
 
 - **p (Jesus' will alignment)** — How aligned was this with Jesus-like values: love, truth, humility, stewardship?
 - **q (outward impact)** — What good did it create in the world around you: work, family, service, finances?
-- **r (embodied practice)** — What good did it create in the world around you: work, family, service, finances?
+- **r (embodied practice)** — Did I honour my body and nervous system while doing it, or did I sacrifice them?
 
 Score each dimension on a 0–10 scale (decimals welcome). The trio keeps the
 backlog tethered to mission, nudges you to look beyond personal output, and
