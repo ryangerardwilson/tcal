@@ -12,6 +12,7 @@ KEY_TODAY = ord("t")
 KEY_LEADER = ord(",")
 KEY_ESC = 27
 KEY_I = ord("i")
+KEY_CAP_I = ord("I")
 KEY_TAB = 9
 KEY_D = ord("d")
 KEY_CTRL_H = 8
@@ -35,6 +36,7 @@ __all__ = [
     "KEY_LEADER",
     "KEY_ESC",
     "KEY_I",
+    "KEY_CAP_I",
     "KEY_TAB",
     "KEY_D",
     "KEY_CTRL_H",

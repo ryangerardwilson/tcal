@@ -69,7 +69,7 @@ hosts), follow the requirements below and execute `python main.py` like before.
 - **Agenda + Month views** with Vim-style `hjkl` navigation
 - **Buckets** (`personal_development`, `thing`, `economic`) to segment work; press `Tab` in Agenda to cycle filters or show all
 - **Single-key view toggle (`a`)** to flip between agenda and month views instantly
-- **External editing** (`i`) that opens the selected task as JSON in `$EDITOR`
+- **Editing shortcuts** — `i` for quick single-field tweaks, `I` to edit the full task payload as pretty JSON in `$EDITOR`
 - **Structured CLI** with explicit `-x/-y/-z/-p/-q/-r` flags for scripting tasks deterministically
 - **North Star metrics** (`p`, `q`, `r`) capturing Jesus' will alignment, outward impact, and embodied practice alongside JTBD fields
 - **Quick delete** by double–tapping `d` (`dd`) in Agenda or the month’s task list
@@ -191,7 +191,8 @@ return exit code `1` with a descriptive error.
 
 ### Agenda & Month (shared)
 
-- `i` – Edit/create via `$EDITOR` (JTBD + p/q/r metrics)
+- `i` – Edit the focused field (or create when empty) via `$EDITOR`
+- `I` – Open the entire selected row as pretty JSON for editing
 - `n` – Create a new event
 - `h` / `j` / `k` / `l` – Move selection
 - `dd` – Delete selected task

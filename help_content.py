@@ -23,6 +23,7 @@ HELP_LINES: tuple[str, ...] = (
     "?            toggle this help",
     "t            jump to today",
     "i            edit/create event",
+    "I            edit current row as JSON",
     "dd           delete selected event",
     "hjkl         navigate (agenda/month)",
     "B            agenda: edit bucket of selected task",

@@ -20,6 +20,7 @@ from config import load_config, config_file_path
 from editor import edit_event_via_editor
 from keys import (
     KEY_A,
+    KEY_CAP_I,
     KEY_CAP_Q,
     KEY_CTRL_H,
     KEY_CTRL_J,
@@ -102,6 +103,53 @@ def _parse_nsm_input(raw: str | None) -> tuple[float, float, float] | None:
     except ValueError:
         return None
     return cast(tuple[float, float, float], values)
+
+
+def _row_editor_seed(event: Event) -> dict[str, object]:
+    return {
+        "jtbd": {
+            "x": event.jtbd.x.strftime(DATETIME_FMT),
+            "y": event.jtbd.y,
+            "z": event.jtbd.z,
+        },
+        "nsm": {
+            "p": event.nsm.p,
+            "q": event.nsm.q,
+            "r": event.nsm.r,
+        },
+    }
+
+
+def _parse_row_editor_json(raw: str, fallback_bucket: BucketName) -> Event:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON: {exc}") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("Edited content must be a JSON object")
+
+    jtbd_data = data.get("jtbd")
+    if not isinstance(jtbd_data, dict):
+        raise ValueError("Edited JSON must include a 'jtbd' object")
+
+    nsm_data = data.get("nsm")
+    if not isinstance(nsm_data, dict):
+        raise ValueError("Edited JSON must include an 'nsm' object")
+
+    bucket_value = data.get("bucket", fallback_bucket)
+    if isinstance(bucket_value, str):
+        bucket_value = bucket_value.strip() or fallback_bucket
+    elif bucket_value is None:
+        bucket_value = fallback_bucket
+
+    payload = {
+        "bucket": bucket_value,
+        "jtbd": jtbd_data,
+        "nsm": nsm_data,
+    }
+
+    return normalize_event_payload(payload)
 
 
 class Orchestrator:
@@ -346,6 +394,13 @@ class Orchestrator:
 
         if ch == KEY_TODAY:
             return self._jump_today()
+
+        if ch == KEY_CAP_I:
+            if self.state.view == "agenda":
+                return self._edit_agenda_row_json(stdscr)
+            if self.state.view == "month" and self.state.month_focus == "events":
+                return self._edit_month_row_json(stdscr)
+            return False
 
         if ch == KEY_I:
             if self.state.view == "agenda":
@@ -1034,6 +1089,59 @@ class Orchestrator:
         self._prune_row_overrides()
         return True
 
+    def _edit_agenda_row_json(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        visible = self._visible_agenda_events()
+        if not visible:
+            return self._edit_or_create(stdscr, force_new=True)
+
+        idx = max(0, min(self.state.agenda_index, len(visible) - 1))
+        event = visible[idx]
+        editor_cmd = os.environ.get("EDITOR", "vim")
+
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            ok, contents, error = self._launch_json_editor(editor_cmd, _row_editor_seed(event))
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if not ok:
+            if error:
+                self._show_overlay(stdscr, error, kind="error")
+            return True
+
+        if contents is None:
+            return True
+
+        try:
+            updated_event = _parse_row_editor_json(contents, event.bucket)
+        except (ValueError, ValidationError) as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        try:
+            new_events = self.calendar.upsert_event(
+                self.state.events,
+                updated_event,
+                replace_dt=(True, event),
+            )
+        except (ValidationError, StorageError) as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        self._replace_row_override(event, updated_event)
+        self.state.events = new_events
+        self._reselect_agenda_event(updated_event)
+        self._prune_row_overrides()
+        return True
+
     def _edit_agenda_bucket(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
         visible = self._visible_agenda_events()
         if not visible:
@@ -1193,6 +1301,59 @@ class Orchestrator:
         self._prune_row_overrides()
         return True
 
+    def _edit_month_row_json(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
+        events = self._month_events_for_selected_date()
+        if not events:
+            return self._edit_or_create(stdscr, force_new=True)
+
+        idx = max(0, min(self.state.month_event_index, len(events) - 1))
+        event = events[idx]
+        editor_cmd = os.environ.get("EDITOR", "vim")
+
+        curses.def_prog_mode()
+        curses.endwin()
+        try:
+            ok, contents, error = self._launch_json_editor(editor_cmd, _row_editor_seed(event))
+        finally:
+            curses.reset_prog_mode()
+            stdscr.refresh()
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
+            stdscr.nodelay(True)
+            stdscr.timeout(100)
+
+        if not ok:
+            if error:
+                self._show_overlay(stdscr, error, kind="error")
+            return True
+
+        if contents is None:
+            return True
+
+        try:
+            updated_event = _parse_row_editor_json(contents, event.bucket)
+        except (ValueError, ValidationError) as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        try:
+            new_events = self.calendar.upsert_event(
+                self.state.events,
+                updated_event,
+                replace_dt=(True, event),
+            )
+        except (ValidationError, StorageError) as exc:
+            self._show_overlay(stdscr, str(exc), kind="error")
+            return True
+
+        self._replace_row_override(event, updated_event)
+        self.state.events = new_events
+        self._reselect_month_event(updated_event)
+        self._prune_row_overrides()
+        return True
+
     def _edit_month_bucket(self, stdscr: "curses.window") -> bool:  # type: ignore[name-defined]
         events = self._month_events_for_selected_date()
         if not events:
@@ -1283,6 +1444,40 @@ class Orchestrator:
                 return False, f"Failed to read edited value: {exc}"
 
             return True, contents.rstrip("\n")
+        finally:
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+
+    def _launch_json_editor(
+        self, editor_cmd: str, seed_payload: dict[str, object]
+    ) -> tuple[bool, str | None, str | None]:
+        cmd = shlex.split(editor_cmd) if editor_cmd and editor_cmd.strip() else ["vim"]
+        with tempfile.NamedTemporaryFile(
+            "w+", suffix=".json", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+            json.dump(seed_payload, tmp, indent=2)
+            tmp.write("\n")
+            tmp.flush()
+        try:
+            try:
+                proc = subprocess.run(cmd + [str(tmp_path)], check=False)
+            except FileNotFoundError:
+                return False, None, f"Editor not found: {cmd[0]}"
+            except Exception as exc:  # noqa: BLE001
+                return False, None, f"Editor failed: {exc}"
+
+            if proc.returncode != 0:
+                return False, None, None
+
+            try:
+                contents = tmp_path.read_text(encoding="utf-8")
+            except Exception as exc:  # noqa: BLE001
+                return False, None, f"Failed to read edited JSON: {exc}"
+
+            return True, contents, None
         finally:
             try:
                 tmp_path.unlink()
